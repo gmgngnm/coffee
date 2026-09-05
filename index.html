@@ -65,34 +65,25 @@
     </div>
 
     <div class="scroll-area timer-body">
-      <div class="scale-row" id="timer-scale-row">
-        <span class="scale-label">Dose</span>
-        <button class="step-btn" id="scale-minus" type="button" aria-label="Less coffee">−</button>
-        <span class="scale-value mono"><span id="scale-dose">15</span><span class="unit">g</span></span>
-        <button class="step-btn" id="scale-plus" type="button" aria-label="More coffee">+</button>
-        <span class="scale-sep">/</span>
-        <span class="scale-value mono"><span id="scale-water">240</span><span class="unit">g</span></span>
-        <span class="scale-ratio" id="scale-ratio">1:16</span>
-      </div>
-
       <div class="dial-wrap">
         <svg class="dial" viewBox="0 0 200 200" aria-hidden="true">
           <circle class="dial-track" cx="100" cy="100" r="88"/>
           <circle class="dial-progress" id="dial-progress" cx="100" cy="100" r="88"/>
         </svg>
         <div class="dial-center">
-          <div class="dial-time mono" id="timer-elapsed">0:00</div>
-          <div class="dial-total mono" id="timer-total">/ 3:00</div>
+          <div class="dial-main mono" id="dial-main">—</div>
+          <div class="dial-sub" id="dial-sub"></div>
         </div>
         <div class="dial-flash" id="dial-flash"></div>
       </div>
 
-      <div class="now-step" id="timer-now">
-        <div class="now-kind" id="timer-now-kind">Ready</div>
-        <div class="now-label" id="timer-now-label">Press start when you are</div>
-        <div class="now-water mono" id="timer-now-water"></div>
+      <div class="pour-dots" id="pour-dots" aria-hidden="true"></div>
+
+      <div class="timer-meta">
+        <span class="mono" id="timer-elapsed">0:00</span>
+        <span class="mono dim" id="timer-total">/ 3:30</span>
+        <span class="mono cd" id="timer-next"></span>
       </div>
-      <div class="next-step" id="timer-next"></div>
 
       <div class="water-bar" id="water-bar" hidden>
         <div class="water-fill" id="water-fill"></div>
@@ -358,16 +349,12 @@
     <div class="scroll-area">
       <h3 class="form-head">Sound</h3>
       <label class="switch-row">
-        <span><strong>Chime</strong><small>Rings at every step</small></span>
+        <span><strong>Chime</strong><small>Rings once per pour number</small></span>
         <input type="checkbox" id="s-chime" checked>
       </label>
       <label class="switch-row">
         <span><strong>Pre-cue</strong><small>A soft tick 3 seconds before</small></span>
         <input type="checkbox" id="s-precue" checked>
-      </label>
-      <label class="switch-row">
-        <span><strong>Voice</strong><small>Says “Second pour, up to 160 grams”</small></span>
-        <input type="checkbox" id="s-voice" checked>
       </label>
       <label class="switch-row">
         <span><strong>Haptics</strong><small>Where the device supports it</small></span>

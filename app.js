@@ -19,11 +19,11 @@
  *   8. 起動
  * ==================================================================== */
 
-const APP_VERSION = "1.4.0";
+const APP_VERSION = "1.5.0";
 
 /* ホームのロゴの下に #002 の形で出す、mainへマージした回数。
    マージのたびに1つ増やす（この見た目になるまでに何回積んだか） */
-const MERGE_COUNT = 5;
+const MERGE_COUNT = 6;
 
 /* ------------------------------------------------------------------ *
  * 1. 下ごしらえ
@@ -221,7 +221,6 @@ const findRoast = (id) => ROASTS.find((r) => r.id === id) || ROASTS[2];
 const DEFAULT_SETTINGS = {
   chime: true,       // 手順の時刻にチーンと鳴らす
   precue: true,      // 3秒前に小さく予告する
-  voice: true,       // 声で手順を読み上げる
   vibe: true,        // 対応端末でバイブ
   wakelock: true,    // タイマー中は画面を消さない
   volume: 70,
@@ -406,39 +405,29 @@ function bellAt(when, base, dur, gain) {
   }
 }
 
-function blipAt(when, freq, gain) {
-  const ctx = audioCtx;
-  const osc = ctx.createOscillator();
-  const g = ctx.createGain();
-  osc.type = "triangle";
-  osc.frequency.setValueAtTime(freq, when);
-  g.gain.setValueAtTime(0.0001, when);
-  g.gain.exponentialRampToValueAtTime(Math.max(0.0002, gain), when + 0.004);
-  g.gain.exponentialRampToValueAtTime(0.0001, when + 0.09);
-  osc.connect(g).connect(ctx.destination);
-  osc.start(when);
-  osc.stop(when + 0.14);
-  scheduledNodes.push(osc);
-}
-
-/* kind: "step"（手順の合図）/ "finish"（できあがり）/ "cue"（予告） */
-function scheduleSound(kind, when) {
+/* 知らせるのは鐘だけ。ことばは使わない。
+   代わりに「鳴らす回数」で何投目かを伝える。
+     1投目 … チン
+     2投目 … チンチン
+     3投目 … チンチンチン
+     終わり … チーーン（低く、長く伸ばす）
+   注ぐ以外の手順（混ぜる・押すなど）は1回。
+   kind: "step" / "finish" / "cue"（予告） */
+function scheduleSound(kind, when, count = 1) {
   if (!ensureAudio()) return;
   const v = volumeGain();
   if (v <= 0) return;
-  if (kind === "cue") { blipAt(when, 700, 0.09 * v); return; }
-  if (kind === "finish") {
-    bellAt(when,        932, 2.4, 0.30 * v);
-    bellAt(when + 0.42, 932, 2.4, 0.26 * v);
-    bellAt(when + 0.84, 1244, 3.0, 0.30 * v);
-    return;
+  if (kind === "cue") { bellAt(when, 1568, 0.4, 0.09 * v); return; }
+  if (kind === "finish") { bellAt(when, 880, 4.4, 0.34 * v); return; }
+  /* 数えられる速さで、かつ間延びしない間隔 */
+  for (let i = 0; i < Math.max(1, count); i++) {
+    bellAt(when + i * 0.26, 1318.5, 0.8, 0.30 * v);
   }
-  bellAt(when, 1046.5, 1.9, 0.32 * v);
 }
 
-function playSoundNow(kind) {
+function playSoundNow(kind, count = 1) {
   if (!ensureAudio()) return;
-  scheduleSound(kind, audioCtx.currentTime + 0.02);
+  scheduleSound(kind, audioCtx.currentTime + 0.02, count);
 }
 
 function cancelScheduledSounds() {
@@ -446,20 +435,6 @@ function cancelScheduledSounds() {
     try { osc.stop(0); } catch (err) { /* すでに鳴り終わっている */ }
   }
   scheduledNodes = [];
-}
-
-function speak(text) {
-  if (!settings.voice || !text || !window.speechSynthesis) return;
-  try {
-    const u = new SpeechSynthesisUtterance(text);
-    u.lang = "en-US";
-    u.rate = 1.05;
-    u.volume = Math.max(0.2, volumeGain());
-    speechSynthesis.cancel();
-    speechSynthesis.speak(u);
-  } catch (err) {
-    console.warn("読み上げに失敗しました:", err);
-  }
 }
 
 function buzz(pattern) {
@@ -477,7 +452,6 @@ const KIND_LABEL = {
 
 const timer = {
   recipe: null,      // null ならレシピなしの計測
-  scale: 1,
   state: "idle",     // idle | running | paused | done
   baseMs: 0,         // 一時停止までに積んだ経過
   startedWall: 0,    // 走り出した時刻（Date.now）
@@ -491,16 +465,11 @@ const timer = {
 const timerElapsedMs = () =>
   timer.state === "running" ? timer.baseMs + (Date.now() - timer.startedWall) : timer.baseMs;
 
-/* 粉量を変えたぶん、湯量も手順の目標量も一緒に伸び縮みさせる */
+/* 分量はレシピ側で決まっている。ここでは手順を時刻順に並べ直すだけ */
 function scaledSteps() {
   const r = timer.recipe;
   if (!r) return [];
-  const steps = (r.steps || [])
-    .map((s) => ({
-      ...s,
-      water: s.water ? Math.round(s.water * timer.scale) : 0,
-    }))
-    .sort((a, b) => a.at - b.at);
+  const steps = (r.steps || []).map((s) => ({ ...s })).sort((a, b) => a.at - b.at);
   if (!steps.some((s) => s.kind === "finish")) {
     const last = steps.length ? steps[steps.length - 1].at : 0;
     steps.push({ at: Math.max(r.totalSec || 0, last + 30), kind: "finish", water: 0, label: "Ready", note: "" });
@@ -514,8 +483,20 @@ function timerTotalSec() {
   return Math.max(timer.recipe?.totalSec || 0, steps[steps.length - 1].at);
 }
 
-const scaledDose  = () => Math.round((timer.recipe?.doseG || 0) * timer.scale * 10) / 10;
-const scaledWater = () => Math.round((timer.recipe?.waterG || 0) * timer.scale);
+const recipeDose  = () => timer.recipe?.doseG || 0;
+const recipeWater = () => timer.recipe?.waterG || 0;
+
+/* 手順の水量は「合計で何gまで」で持っている。その回に注ぐぶんは、
+   1つ前の注ぎとの差。画面の主役はこちらの数字 */
+function pourAmount(steps, idx) {
+  const step = steps[idx];
+  if (!step?.water) return 0;
+  let prev = 0;
+  for (let i = idx - 1; i >= 0; i--) {
+    if (steps[i].water) { prev = steps[i].water; break; }
+  }
+  return step.water - prev;
+}
 
 /* 注ぐ手順だけを数えて「何投目か」を出す。回数を知らせるための土台 */
 function pourIndex(steps, idx) {
@@ -525,18 +506,6 @@ function pourIndex(steps, idx) {
 }
 const pourTotal = (steps) => steps.filter((s) => s.kind === "pour").length;
 
-function stepSpeech(step, steps, idx) {
-  if (step.kind === "finish") return "Your coffee is ready";
-  if (step.kind === "pour") {
-    const n = pourIndex(steps, idx);
-    const total = pourTotal(steps);
-    const head = step.label || `Pour ${n}`;
-    return step.water ? `${head}. Up to ${step.water} grams`
-      : `${head}. ${total - n} more to go`;
-  }
-  return step.label || KIND_LABEL[step.kind] || "Next step";
-}
-
 /* 走り出す／再開するたびに、これから来る音を全部予約し直す */
 function scheduleUpcomingSounds() {
   cancelScheduledSounds();
@@ -545,14 +514,19 @@ function scheduleUpcomingSounds() {
   if (!ctx) return;
   const elapsed = timerElapsedMs() / 1000;
   const now = ctx.currentTime;
-  for (const step of scaledSteps()) {
+  const steps = scaledSteps();
+  steps.forEach((step, i) => {
     const delay = step.at - elapsed;
-    if (delay < 0) continue;
-    scheduleSound(step.kind === "finish" ? "finish" : "step", now + delay);
+    if (delay < 0) return;
+    if (step.kind === "finish") {
+      scheduleSound("finish", now + delay);
+    } else {
+      scheduleSound("step", now + delay, step.kind === "pour" ? pourIndex(steps, i) : 1);
+    }
     if (settings.precue && delay > 3.2 && step.kind !== "finish") {
       scheduleSound("cue", now + delay - 3);
     }
-  }
+  });
 }
 
 async function acquireWakeLock() {
@@ -578,7 +552,6 @@ function openTimer(recipe) {
   cancelScheduledSounds();
   releaseWakeLock();
   timer.recipe = recipe ? JSON.parse(JSON.stringify(recipe)) : null;
-  timer.scale = 1;
   timer.state = "idle";
   timer.baseMs = 0;
   timer.firedIdx = -1;
@@ -665,7 +638,6 @@ function announceCrossedSteps(steps, elapsedSec) {
   if (last < 0) return;
   timer.firedIdx = last;
   const step = steps[last];
-  speak(stepSpeech(step, steps, last));
   buzz(step.kind === "finish" ? [120, 80, 120, 80, 220] : [90]);
   const flash = $("dial-flash");
   flash.classList.remove("ring");
@@ -807,15 +779,6 @@ const DIAL_CIRCUMFERENCE = 2 * Math.PI * 88;
 
 function renderTimerStatic() {
   const free = !timer.recipe;
-  const idle = timer.state === "idle";
-
-  $("timer-scale-row").hidden = free;
-  $("timer-scale-row").classList.toggle("locked", !idle);
-  if (!free) {
-    $("scale-dose").textContent = String(scaledDose());
-    $("scale-water").textContent = String(scaledWater());
-    $("scale-ratio").textContent = ratioText(scaledDose(), scaledWater());
-  }
 
   const toggle = $("timer-toggle");
   toggle.textContent = timer.state === "running" ? "Pause"
@@ -824,11 +787,22 @@ function renderTimerStatic() {
   toggle.classList.toggle("running", timer.state === "running");
   $("timer-lap").hidden = !free || timer.state === "idle";
   $("timer-to-log").hidden = !(timer.state === "done" || (free && timer.state !== "idle"));
-  $("water-bar").hidden = free || !scaledWater();
-  $("timer-total").textContent = free ? "no recipe" : `/ ${fmtClock(timerTotalSec())}`;
-  if (!free) $("water-goal").textContent = String(scaledWater());
+  $("water-bar").hidden = free || !recipeWater();
+  $("timer-total").textContent = free ? "" : `/ ${fmtClock(timerTotalSec())}`;
+  if (!free) $("water-goal").textContent = String(recipeWater());
 
+  renderPourDots();
   renderTimerTrack();
+}
+
+function renderPourDots() {
+  const box = $("pour-dots");
+  box.innerHTML = "";
+  if (!timer.recipe) return;
+  const steps = scaledSteps();
+  const total = pourTotal(steps);
+  if (total < 2) return;
+  for (let i = 0; i < total; i++) box.appendChild(el("span", "pd"));
 }
 
 function renderTimerTrack() {
@@ -845,16 +819,15 @@ function renderTimerTrack() {
     return;
   }
   const steps = scaledSteps();
-  const total = pourTotal(steps);
   steps.forEach((s, i) => {
     const row = el("div", "track-step");
     row.dataset.idx = String(i);
     row.appendChild(el("span", "ts-time mono", fmtClock(s.at)));
-    const label = s.kind === "pour" && total > 1
-      ? `${s.label || `Pour ${pourIndex(steps, i)}`} (${pourIndex(steps, i)}/${total})`
-      : (s.label || KIND_LABEL[s.kind] || "");
-    row.appendChild(el("span", "ts-label", label));
-    if (s.water) row.appendChild(el("span", "ts-water", `${s.water}g`));
+    /* 注ぐ手順は数字だけで足りる。ことばを出すのは、混ぜる・押すなど
+       数字にならない手順のときだけにする */
+    row.appendChild(el("span", "ts-label", s.kind === "pour" ? "" : (s.label || KIND_LABEL[s.kind] || "")));
+    const amount = pourAmount(steps, i);
+    if (amount) row.appendChild(el("span", "ts-water mono", `${amount} g`));
     box.appendChild(row);
   });
 }
@@ -863,14 +836,17 @@ function renderTimerLive() {
   const elapsedSec = timerElapsedMs() / 1000;
   $("timer-elapsed").textContent = fmtClock(elapsedSec);
   const dial = $("dial-progress");
+  const main = $("dial-main");
+  const sub = $("dial-sub");
 
   if (!timer.recipe) {
-    /* レシピなしのときは、1分で一周する秒針のように回す */
+    /* レシピなしのときは経過そのものが主役。1分で一周させる */
     const p = (elapsedSec % 60) / 60;
     dial.style.strokeDashoffset = String(DIAL_CIRCUMFERENCE * (1 - p));
-    $("timer-now-kind").textContent = timer.state === "running" ? "Timing" : "No recipe";
-    $("timer-now-label").textContent = timer.laps.length ? `${timer.laps.length} pours so far` : "Free timer";
-    $("timer-now-water").textContent = "";
+    main.textContent = fmtClock(elapsedSec);
+    main.classList.remove("with-unit");
+    sub.textContent = timer.laps.length ? `${timer.laps.length}` : "";
+    $("timer-elapsed").textContent = "";
     $("timer-next").textContent = "";
     return;
   }
@@ -879,52 +855,55 @@ function renderTimerLive() {
   const total = timerTotalSec();
   if (timer.state === "running") announceCrossedSteps(steps, elapsedSec);
 
-  dial.style.strokeDashoffset = String(DIAL_CIRCUMFERENCE * (1 - Math.min(1, elapsedSec / (total || 1))));
+  dial.style.strokeDashoffset =
+    String(DIAL_CIRCUMFERENCE * (1 - Math.min(1, elapsedSec / (total || 1))));
 
   let curIdx = -1;
   for (let i = 0; i < steps.length; i++) if (steps[i].at <= elapsedSec) curIdx = i; else break;
-  const cur = curIdx >= 0 ? steps[curIdx] : null;
   const next = steps[curIdx + 1] || null;
 
-  const kindEl = $("timer-now-kind");
-  const labelEl = $("timer-now-label");
-  const waterEl = $("timer-now-water");
-  if (timer.state === "idle") {
-    kindEl.textContent = "Ready";
-    labelEl.textContent = "Press start when you are";
-    waterEl.textContent = `${scaledDose()} g of coffee, ${scaledWater()} g of water`;
-  } else if (cur) {
-    const pt = pourTotal(steps);
-    kindEl.textContent = cur.kind === "pour" && pt > 1
-      ? `${KIND_LABEL.pour} ${pourIndex(steps, curIdx)}/${pt}`
-      : (KIND_LABEL[cur.kind] || "Step");
-    labelEl.textContent = cur.label || KIND_LABEL[cur.kind] || "";
-    waterEl.textContent = cur.water ? `Up to ${cur.water} g total` : (cur.note || "");
+  /* 主役は「この回に注ぐ量」。始める前は、これから注ぐ1投目を見せておく。
+     数字にならない手順（混ぜる・押す）のときだけ、ことばに入れ替える */
+  const showIdx = timer.state === "idle"
+    ? steps.findIndex((st) => st.kind === "pour")
+    : curIdx;
+  const shown = showIdx >= 0 ? steps[showIdx] : null;
+  const amount = shown ? pourAmount(steps, showIdx) : 0;
+
+  if (timer.state === "done") {
+    main.textContent = fmtClock(total);
+    main.classList.remove("with-unit");
+    sub.textContent = "";
+  } else if (amount) {
+    main.innerHTML = `${amount}<span class="unit">g</span>`;
+    main.classList.add("with-unit");
+    sub.textContent = shown.kind === "pour" ? "" : (shown.label || "");
   } else {
-    kindEl.textContent = "Coming up";
-    labelEl.textContent = next ? (next.label || "") : "";
-    waterEl.textContent = "";
+    main.textContent = shown ? (shown.label || KIND_LABEL[shown.kind] || "—") : "—";
+    main.classList.remove("with-unit");
+    sub.textContent = "";
+  }
+  main.classList.toggle("waiting", timer.state === "idle");
+
+  /* 次の合図までの秒数。数字だけ出す */
+  $("timer-next").textContent =
+    next && timer.state === "running" ? String(Math.max(0, Math.ceil(next.at - elapsedSec))) : "";
+
+  /* 何投目かは点で示す。今の1つだけ大きくする */
+  const dots = $("pour-dots").children;
+  const poured = timer.state === "idle" ? 0 : pourIndex(steps, curIdx);
+  for (let i = 0; i < dots.length; i++) {
+    dots[i].classList.toggle("on", i < poured);
+    dots[i].classList.toggle("now", i === poured - 1);
   }
 
-  const nextEl = $("timer-next");
-  if (next && timer.state !== "done") {
-    const left = Math.max(0, Math.ceil(next.at - elapsedSec));
-    const name = next.label || KIND_LABEL[next.kind] || "next";
-    nextEl.innerHTML = `${escapeHtml(name)} in <span class="cd">${left}</span> s`;
-  } else if (timer.state === "done") {
-    nextEl.textContent = "Your coffee is ready";
-  } else {
-    nextEl.textContent = "";
-  }
-
-  /* 湯量は「合計で何gまで」。直近の注ぎ手順の目標をそのまま見せる */
-  const goal = scaledWater();
+  const goal = recipeWater();
   if (goal) {
-    let poured = 0;
-    for (let i = 0; i <= curIdx; i++) if (steps[i].water) poured = steps[i].water;
-    if (timer.state === "idle") poured = 0;
-    $("water-now").textContent = String(poured);
-    $("water-fill").style.width = `${Math.min(100, (poured / goal) * 100)}%`;
+    let sofar = 0;
+    for (let i = 0; i <= curIdx; i++) if (steps[i].water) sofar = steps[i].water;
+    if (timer.state === "idle") sofar = 0;
+    $("water-now").textContent = String(sofar);
+    $("water-fill").style.width = `${Math.min(100, (sofar / goal) * 100)}%`;
   }
 
   const rows = $("timer-steps").children;
@@ -977,17 +956,6 @@ function syncMuteIcon() {
   if (box) box.checked = on;
 }
 
-function changeScale(deltaG) {
-  if (!timer.recipe || timer.state !== "idle") return;
-  const base = timer.recipe.doseG || 15;
-  const next = Math.max(5, Math.min(120, Math.round((scaledDose() + deltaG) * 10) / 10));
-  timer.scale = next / base;
-  renderTimerStatic();
-  renderTimerLive();
-}
-$("scale-minus").addEventListener("click", () => changeScale(-1));
-$("scale-plus").addEventListener("click", () => changeScale(1));
-
 /* 淹れ終わったら、そのまま味の記録へ。器具や分量は書き写さなくていい */
 $("timer-to-log").addEventListener("click", async () => {
   const draft = emptyBrew();
@@ -999,8 +967,8 @@ $("timer-to-log").addEventListener("click", async () => {
     draft.recipeName = r.name;
     draft.method = r.method || "";
     draft.grind = r.grind || "";
-    draft.doseG = scaledDose();
-    draft.waterG = scaledWater();
+    draft.doseG = recipeDose();
+    draft.waterG = recipeWater();
     draft.tempC = r.tempC ?? null;
     const stored = findRecipe(r.id);
     if (stored) { stored.usedAt = Date.now(); await saveRecipe(stored); }
@@ -1472,6 +1440,26 @@ function renderStepEditor() {
   });
 }
 
+/* 湯量を変えたら、手順の目標量も同じ割合で動かす。分量を決める場所が
+   レシピ画面に移ったぶん、ここで辻褄を合わせないと手順だけ取り残される */
+$("r-water").addEventListener("change", () => {
+  const next = num($("r-water").value);
+  const before = editingRecipe.waterG;
+  if (!next || !before || next === before) return;
+  const k = next / before;
+  let moved = 0;
+  for (const step of editingRecipe.steps) {
+    if (!step.water) continue;
+    step.water = Math.round(step.water * k);
+    moved++;
+  }
+  editingRecipe.waterG = next;
+  if (moved) {
+    renderStepEditor();
+    toast(`Steps rescaled to ${next} g`);
+  }
+});
+
 $("r-add-step").addEventListener("click", () => {
   const steps = editingRecipe.steps;
   const last = steps[steps.length - 1];
@@ -1530,7 +1518,6 @@ function bindSwitch(id, key, after) {
 function renderSettings() {
   $("s-chime").checked = settings.chime;
   $("s-precue").checked = settings.precue;
-  $("s-voice").checked = settings.voice;
   $("s-vibe").checked = settings.vibe;
   $("s-wakelock").checked = settings.wakelock;
   $("s-volume").value = String(settings.volume);
@@ -1544,7 +1531,6 @@ function renderSettings() {
 
 bindSwitch("s-chime", "chime", () => { syncMuteIcon(); if (timer.state === "running") scheduleUpcomingSounds(); });
 bindSwitch("s-precue", "precue", () => { if (timer.state === "running") scheduleUpcomingSounds(); });
-bindSwitch("s-voice", "voice");
 bindSwitch("s-vibe", "vibe");
 bindSwitch("s-wakelock", "wakelock", () => {
   if (settings.wakelock && timer.state === "running") acquireWakeLock(); else releaseWakeLock();
@@ -1554,7 +1540,7 @@ $("s-volume").addEventListener("input", (e) => {
   $("s-volume-out").textContent = `${settings.volume}%`;
 });
 $("s-volume").addEventListener("change", saveSettings);
-$("s-test-chime").addEventListener("click", () => { playSoundNow("step"); speak("Second pour. Up to 160 grams"); });
+$("s-test-chime").addEventListener("click", () => playSoundNow("step", 2));
 /* 見本の丸は、いま見えている面での色をそのまま塗る。選んだ結果が
    そのとおりに出るほうが、選びやすい */
 function renderRoastPicker() {
