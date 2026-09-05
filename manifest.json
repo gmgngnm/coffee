@@ -1,16 +1,25 @@
 {
-  "name": "Coffeerence — コーヒーの記録とタイマー",
+  "name": "Coffeerence — brew log and timer",
   "short_name": "Coffeerence",
-  "description": "コーヒーの淹れ方と味を記録し、レシピに合わせて注ぐタイミングを知らせるアプリ",
+  "description": "Log how you brew your coffee and how it tasted, with a timer that calls out every pour.",
   "start_url": "./index.html",
   "scope": "./",
   "display": "standalone",
   "orientation": "portrait",
   "background_color": "#F1F3EE",
-  "theme_color": "#1F6F63",
-  "lang": "ja",
+  "theme_color": "#7C4522",
+  "lang": "en",
   "icons": [
-    { "src": "icons/icon-192.png", "sizes": "192x192", "type": "image/png" },
-    { "src": "icons/icon-512.png", "sizes": "512x512", "type": "image/png", "purpose": "any maskable" }
+    {
+      "src": "icons/icon-192.png",
+      "sizes": "192x192",
+      "type": "image/png"
+    },
+    {
+      "src": "icons/icon-512.png",
+      "sizes": "512x512",
+      "type": "image/png",
+      "purpose": "any maskable"
+    }
   ]
 }
