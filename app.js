@@ -19,11 +19,11 @@
  *   8. 起動
  * ==================================================================== */
 
-const APP_VERSION = "1.5.0";
+const APP_VERSION = "1.6.0";
 
 /* ホームのロゴの下に #002 の形で出す、mainへマージした回数。
    マージのたびに1つ増やす（この見た目になるまでに何回積んだか） */
-const MERGE_COUNT = 6;
+const MERGE_COUNT = 7;
 
 /* ------------------------------------------------------------------ *
  * 1. 下ごしらえ
@@ -775,7 +775,14 @@ function renderStats(box, list) {
 }
 
 /* ---------- タイマーの見た目 ---------- */
-const DIAL_CIRCUMFERENCE = 2 * Math.PI * 88;
+const RING_OUTER = 2 * Math.PI * 88;   // 抽出の終わりまで
+const RING_INNER = 2 * Math.PI * 70;   // その回の終わりまで
+
+/* 進み具合(0〜1)を、リングの描き残しに変える */
+function setRing(id, circumference, progress) {
+  const p = Math.max(0, Math.min(1, progress || 0));
+  $(id).style.strokeDashoffset = String(circumference * (1 - p));
+}
 
 function renderTimerStatic() {
   const free = !timer.recipe;
@@ -835,14 +842,13 @@ function renderTimerTrack() {
 function renderTimerLive() {
   const elapsedSec = timerElapsedMs() / 1000;
   $("timer-elapsed").textContent = fmtClock(elapsedSec);
-  const dial = $("dial-progress");
   const main = $("dial-main");
   const sub = $("dial-sub");
 
   if (!timer.recipe) {
-    /* レシピなしのときは経過そのものが主役。1分で一周させる */
-    const p = (elapsedSec % 60) / 60;
-    dial.style.strokeDashoffset = String(DIAL_CIRCUMFERENCE * (1 - p));
+    /* レシピなしのときは経過そのものが主役。外側を1分で一周させる */
+    $("dial").classList.add("no-steps");
+    setRing("ring-total", RING_OUTER, (elapsedSec % 60) / 60);
     main.textContent = fmtClock(elapsedSec);
     main.classList.remove("with-unit");
     sub.textContent = timer.laps.length ? `${timer.laps.length}` : "";
@@ -855,12 +861,20 @@ function renderTimerLive() {
   const total = timerTotalSec();
   if (timer.state === "running") announceCrossedSteps(steps, elapsedSec);
 
-  dial.style.strokeDashoffset =
-    String(DIAL_CIRCUMFERENCE * (1 - Math.min(1, elapsedSec / (total || 1))));
+  $("dial").classList.remove("no-steps");
+  setRing("ring-total", RING_OUTER, elapsedSec / (total || 1));
 
   let curIdx = -1;
   for (let i = 0; i < steps.length; i++) if (steps[i].at <= elapsedSec) curIdx = i; else break;
   const next = steps[curIdx + 1] || null;
+
+  /* 内側は、いまの手順が始まってから次の合図までの進み具合。
+     まだ1つ目が来ていない間は、開始から1つ目までを刻む */
+  const stepFrom = curIdx >= 0 ? steps[curIdx].at : 0;
+  const stepTo = next ? next.at : total;
+  const span = stepTo - stepFrom;
+  setRing("ring-step", RING_INNER,
+    timer.state === "idle" ? 0 : (span > 0 ? (elapsedSec - stepFrom) / span : 1));
 
   /* 主役は「この回に注ぐ量」。始める前は、これから注ぐ1投目を見せておく。
      数字にならない手順（混ぜる・押す）のときだけ、ことばに入れ替える */

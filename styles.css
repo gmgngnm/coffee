@@ -218,12 +218,20 @@ input,select,textarea{font-family:inherit;}
 .timer-body{display:flex;flex-direction:column;}
 .dial-wrap{position:relative;width:min(74vw,278px);aspect-ratio:1;margin:2px auto 6px;}
 .dial{width:100%;height:100%;transform:rotate(-90deg);}
-.dial-track{fill:none;stroke:var(--line);stroke-width:9;}
-.dial-progress{
-  fill:none;stroke:var(--accent);stroke-width:9;stroke-linecap:round;
-  stroke-dasharray:552.9;stroke-dashoffset:552.9;
+/* 二重のリング。外側は抽出の終わりまで、内側はその回の終わりまでを示す。
+   外側を濃く、内側を薄くして、どちらが全体かを色の重さで分ける */
+.dial-track{fill:none;stroke:var(--line);}
+.dial-track.outer{stroke-width:9;}
+.dial-track.inner{stroke-width:7;opacity:.55;}
+.dial-ring{
+  fill:none;stroke:var(--accent);stroke-linecap:round;
   transition:stroke-dashoffset .12s linear;
 }
+.dial-ring.outer{stroke-width:9;stroke-dasharray:552.92;stroke-dashoffset:552.92;}
+.dial-ring.inner{stroke-width:7;stroke-dasharray:439.82;stroke-dashoffset:439.82;opacity:.45;}
+/* レシピなしのときは、刻む相手がいないので内側は出さない */
+.dial.no-steps .dial-track.inner,
+.dial.no-steps .dial-ring.inner{display:none;}
 .dial-center{
   position:absolute;inset:0;display:flex;flex-direction:column;
   align-items:center;justify-content:center;gap:4px;padding:0 18px;
