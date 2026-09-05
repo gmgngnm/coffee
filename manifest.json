@@ -1,13 +1,13 @@
 {
-  "name": "BrewNote — コーヒーの記録とタイマー",
-  "short_name": "BrewNote",
+  "name": "Coffeerence — コーヒーの記録とタイマー",
+  "short_name": "Coffeerence",
   "description": "コーヒーの淹れ方と味を記録し、レシピに合わせて注ぐタイミングを知らせるアプリ",
   "start_url": "./index.html",
   "scope": "./",
   "display": "standalone",
   "orientation": "portrait",
-  "background_color": "#FAF5EE",
-  "theme_color": "#4A2C1D",
+  "background_color": "#F1F3EE",
+  "theme_color": "#1F6F63",
   "lang": "ja",
   "icons": [
     { "src": "icons/icon-192.png", "sizes": "192x192", "type": "image/png" },
