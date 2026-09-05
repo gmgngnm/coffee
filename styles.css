@@ -264,16 +264,6 @@ input,select,textarea{font-family:inherit;}
 }
 .timer-meta .dim{color:var(--ink-faint);}
 .timer-meta .cd{color:var(--accent);font-size:17px;min-width:22px;text-align:right;}
-.dial-flash{
-  position:absolute;inset:-6px;border-radius:50%;pointer-events:none;
-  border:3px solid var(--accent);opacity:0;
-}
-.dial-flash.ring{animation:ringPulse .9s ease-out;}
-@keyframes ringPulse{
-  0%{opacity:.9;transform:scale(1);}
-  100%{opacity:0;transform:scale(1.13);}
-}
-
 .now-step{text-align:center;margin-top:4px;}
 .now-kind{
   display:inline-block;font-size:11px;letter-spacing:.08em;color:var(--accent);
