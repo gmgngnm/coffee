@@ -19,11 +19,11 @@
  *   8. 起動
  * ==================================================================== */
 
-const APP_VERSION = "2.1.0";
+const APP_VERSION = "2.2.0";
 
 /* ホームのロゴの下に #002 の形で出す、mainへマージした回数。
    マージのたびに1つ増やす（この見た目になるまでに何回積んだか） */
-const MERGE_COUNT = 12;
+const MERGE_COUNT = 13;
 
 /* ------------------------------------------------------------------ *
  * 1. 下ごしらえ
@@ -224,6 +224,7 @@ const DEFAULT_SETTINGS = {
   vibe: true,        // 対応端末でバイブ
   wakelock: true,    // タイマー中は画面を消さない
   volume: 70,
+  countdown: 3,      // 開始を押してから走り出すまでの秒数（0〜10）
   theme: "auto",
   roast: "medium",   // アクセントの焙煎度
 };
@@ -554,12 +555,12 @@ function openTimer(recipe) {
   releaseWakeLock();
   timer.recipe = recipe ? JSON.parse(JSON.stringify(recipe)) : null;
   timer.state = "idle";
+  timer.countUntil = 0;
   timer.baseMs = 0;
   timer.firedIdx = -1;
   timer.laps = [];
   timer.startedAt = 0;
-  brew.level = 0; brew.target = 0; brew.at = 0;
-  brew.pours = []; brew.ripples = []; brew.puffs = [];
+  resetBrewBackground();
   $("timer-title").textContent = recipe ? recipe.name : "Free timer";
   renderTimerStatic();
   renderTimerLive();
@@ -570,9 +571,28 @@ function openTimer(recipe) {
 function startTimer() {
   ensureAudio();                       // 最初の指で音を解禁しておく
   if (timer.state === "done") resetTimer();
+  /* 押してすぐ始まると、ケトルを構える間がない。既定で3秒だけ数える */
+  const wait = timer.state === "idle" ? Math.max(0, Math.min(10, settings.countdown ?? 3)) : 0;
+  if (wait > 0) {
+    timer.state = "count";
+    timer.countUntil = Date.now() + wait * 1000;
+    if (settings.chime && ensureAudio()) {
+      for (let i = 0; i < wait; i++) scheduleSound("cue", audioCtx.currentTime + i);
+    }
+    acquireWakeLock();
+    startTimerLoop();
+    renderTimerStatic();
+    return;
+  }
+  beginRun();
+}
+
+/* 数え下げを終えて、実際に走り出す */
+function beginRun() {
   if (!timer.startedAt) timer.startedAt = Date.now();
   timer.state = "running";
   timer.startedWall = Date.now();
+  cancelScheduledSounds();
   scheduleUpcomingSounds();
   acquireWakeLock();
   startTimerLoop();
@@ -591,10 +611,12 @@ function pauseTimer() {
 
 function resetTimer() {
   timer.state = "idle";
+  timer.countUntil = 0;
   timer.baseMs = 0;
   timer.firedIdx = -1;
   timer.laps = [];
   timer.startedAt = 0;
+  resetBrewBackground();
   cancelScheduledSounds();
   releaseWakeLock();
   stopTimerLoop();
@@ -859,47 +881,53 @@ function drawSectorDial(sectors) {
   }
 }
 
-/* ---------- 背景（迫り上がる液面・注ぎ・湯気） ---------- *
- *  絵として嘘をつかない範囲で、実際の見え方に寄せている。
- *   ・落ちる湯は、速くなるぶん細くなる（連続の式と自由落下）
- *   ・落ちた点から波紋が外へ伝わる（一様に揺らすのではなく）
- *   ・湯気は線ではなく、昇りながら膨らんで薄れる粒の集まり
+/* ---------- 背景（滴下・液面・湯気・目盛り） ---------- *
+ *  画面をビーカーに見立てる。上のドリッパーから雫が落ち、落ちたぶんだけ
+ *  液面が上がる。注いだ直後はポタポタと速く、その回の終わりに近づくほど
+ *  間が空いて、ほぼ止まる（溜めた湯が減るほど落ちにくくなる）。
+ *  右端には、投ごとの合計量の位置に目盛りを引く。
  * ------------------------------------------------------------------ */
 const brew = {
-  level: 0,        // いま描いている高さ（0〜1）
-  target: 0,       // 注いだぶんの高さ
+  level: 0,        // 落ちきったぶんの高さ（0〜1）
+  target: 0,       // レシピ上、いままでに注いだ量
+  counted: 0,      // そのうち、もう雫に割り当てたぶん
+  pending: 0,      // ドリッパーに残っていて、これから落ちるぶん
+  acc: 0,          // 雫1つぶんに満たない端数
   at: 0,
-  pours: [],       // 落ちている湯 {t0, x}
-  ripples: [],     // 水面を伝わる波 {t0, x}
-  puffs: [],       // 湯気の粒
+  drops: [],       // 落ちている雫
+  ripples: [],     // 水面を伝わる波
+  puffs: [],       // 湯気
   puffAt: 0,
+  marks: [],       // 目盛り（各投の合計量 ml）
+  total: 0,        // 湯の合計量
 };
-const POUR_MS = 2200;          // 湯を落として見せる長さ
 const LEVEL_MAX = 0.92;        // 最後は画面の上のほうまで満ちる
-const V0 = 300, GRAV = 1700;   // 注ぎ口での速さと重力（px/s, px/s²）
+const DRIP_TAU = 11;           // 溜めた湯が落ちきるまでの目安（秒）
+const DROP_Q = 0.005;          // 雫1つが上げる高さ
+const DROP_G = 1500;           // 雫の落下（px/s²）
 
-function splashPour() {
-  brew.pours.push({
-    t0: performance.now(),
-    x: 0.40 + Math.random() * 0.2,          // 液面が低いとき（円の下）
-    side: Math.random() < 0.5 ? 0.1 : 0.9,  // 高いとき（円の脇）
+function splashPour() { /* 雫は溜まったぶんから自然に落ちる。合図は要らない */ }
+
+function resetBrewBackground() {
+  Object.assign(brew, {
+    level: 0, target: 0, counted: 0, pending: 0, acc: 0, at: 0,
+    drops: [], ripples: [], puffs: [], puffAt: 0,
   });
-  if (brew.pours.length > 3) brew.pours.shift();
 }
 
 /* 水面の高さ。うねりに、落ちた点から広がる波を重ねる */
 function surfaceAt(x, base, t, now) {
   let y = base
-    + Math.sin(x / 88 + t * 0.8) * 2.6
-    + Math.sin(x / 43 - t * 1.35) * 1.5
-    + Math.sin(x / 210 + t * 0.35) * 3.2;
+    + Math.sin(x / 88 + t * 0.8) * 2.2
+    + Math.sin(x / 43 - t * 1.35) * 1.2
+    + Math.sin(x / 210 + t * 0.35) * 2.8;
   for (const r of brew.ripples) {
     const age = (now - r.t0) / 1000;
-    if (age < 0 || age > 2.6) continue;
+    if (age < 0 || age > 2.2) continue;
     const d = Math.abs(x - r.x);
-    const front = age * 190;                     // 波の進む速さ
-    const env = Math.exp(-age / 1.1) * Math.exp(-Math.abs(d - front) / 80);
-    y += Math.sin((d - front) / 24) * 10 * env;
+    const front = age * 170;
+    const env = r.power * Math.exp(-age / 0.85) * Math.exp(-Math.abs(d - front) / 70);
+    y += Math.sin((d - front) / 22) * 7 * env;
   }
   return y;
 }
@@ -917,151 +945,111 @@ function drawBrewBackground(now) {
   ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
   ctx.clearRect(0, 0, w, h);
 
-  const dt = Math.min(120, now - (brew.at || now - 16));
+  const dtMs = Math.min(120, now - (brew.at || now - 16));
+  const dt = dtMs / 1000;
   brew.at = now;
   const t = now / 1000;
-  /* 注いだぶんは、落ちてくる湯に合わせてゆっくり満ちる */
-  brew.level += (brew.target - brew.level) * (1 - Math.exp(-dt / 620));
-  brew.ripples = brew.ripples.filter((r) => now - r.t0 < 2600);
-  brew.pours = brew.pours.filter((p) => now - p.t0 < POUR_MS + 400);
-  if (brew.level < 0.002 && brew.target <= 0 && !brew.puffs.length) return;
+
+  /* 注がれたぶんを、ドリッパーの溜まりに移す */
+  if (brew.target > brew.counted) {
+    brew.pending += brew.target - brew.counted;
+    brew.counted = brew.target;
+  }
+  if (brew.target < brew.counted) {         // リセットされた
+    brew.counted = brew.target;
+    brew.pending = 0;
+  }
+
+  /* 溜まりが多いほど速く落ちる。減るほど間が空き、やがて止まる。
+     淹れ終わったあとまでポタポタ続くのは間延びするので、そこは早める */
+  if (brew.pending > 0) {
+    const tau = timer.state === "done" ? 2 : DRIP_TAU;
+    brew.acc += Math.min(brew.pending, (brew.pending / tau) * dt);
+    while (brew.acc >= DROP_Q && brew.drops.length < 40 && brew.pending > 0) {
+      const q = Math.min(DROP_Q, brew.pending);
+      brew.acc -= DROP_Q;
+      brew.pending -= q;
+      brew.drops.push({
+        x: w * 0.5 + (Math.random() - 0.5) * 26,
+        y: -14 - Math.random() * 30,
+        v: 40 + Math.random() * 60,
+        r: 3.4 + Math.random() * 1.6,
+        q,
+      });
+    }
+    /* 最後のひとしずくが残り続けないよう、細くなったら畳む */
+    if (brew.pending < DROP_Q * 0.4 && !brew.drops.length) {
+      brew.level += brew.pending;
+      brew.pending = 0;
+    }
+  }
 
   const { accent } = themeColors();
   const base = h - brew.level * LEVEL_MAX * h;
   const yAt = (x) => surfaceAt(x, base, t, now);
+  brew.ripples = brew.ripples.filter((r) => now - r.t0 < 2200);
 
   /* --- 液 --- */
-  /* 濃さは水面からの深さで決める。上に来ても、文字の背後がべたに
-     ならないよう頭打ちにする */
-  const grad = ctx.createLinearGradient(0, base - 6, 0, Math.min(h, base + 320));
-  grad.addColorStop(0, cssRgba(accent, 0.03));
-  grad.addColorStop(0.35, cssRgba(accent, 0.13));
-  grad.addColorStop(1, cssRgba(accent, 0.2));
-  ctx.fillStyle = grad;
-  ctx.beginPath();
-  ctx.moveTo(0, yAt(0));
-  for (let x = 0; x <= w; x += 4) ctx.lineTo(x, yAt(x));
-  ctx.lineTo(w, h);
-  ctx.lineTo(0, h);
-  ctx.closePath();
-  ctx.fill();
-
-  /* 水面の線と、そのすぐ下の照り返し */
-  ctx.strokeStyle = cssRgba(accent, 0.22);
-  ctx.lineWidth = 1.4;
-  ctx.beginPath();
-  ctx.moveTo(0, yAt(0));
-  for (let x = 0; x <= w; x += 4) ctx.lineTo(x, yAt(x));
-  ctx.stroke();
-  ctx.strokeStyle = cssRgba(accent, 0.07);
-  ctx.lineWidth = 5;
-  ctx.beginPath();
-  ctx.moveTo(0, yAt(0) + 6);
-  for (let x = 0; x <= w; x += 6) ctx.lineTo(x, yAt(x) + 6);
-  ctx.stroke();
-
-  /* --- 落ちる湯 --- */
-  for (const p of brew.pours) {
-    const since = now - p.t0;
-    /* 落とす位置は最初の1コマで決める。液面が円の下端まで来ていたら、
-       円や文字を突き抜けないよう脇へ寄せる。途中で変えると横に飛ぶ */
-    if (p.px === undefined) {
-      /* 判定は、いまの高さではなく、この注ぎで上がりきる高さで行う。
-         注ぎのあいだに液面が上がるので、いまを見ると必ず中央になる */
-      const willBe = h - brew.target * LEVEL_MAX * h;
-      p.px = (willBe > h * 0.6 ? p.x : p.side) * w;
-    }
-    const px = p.px;
-    const surface = yAt(px);
-    /* 円や文字を貫かないよう、長すぎない位置から落とす */
-    const len = Math.min(200, Math.max(46, surface - h * 0.56));
-    const top = surface - len;
-    const fade = since < 180 ? since / 180
-      : since > POUR_MS - 500 ? Math.max(0, (POUR_MS - since) / 500) : 1;
-    if (fade <= 0) continue;
-
-    /* 落ちるほど速くなり、そのぶん細くなる（連続の式）。
-       横のゆらぎは、上から下へ流れていくように位相をずらす */
-    const w0 = 11;
-    const xAt = (dy) => px + Math.sin(dy / 34 - since / 90) * (0.7 + dy / len * 1.6);
-    const widthAt = (dy) => w0 * Math.sqrt(V0 / Math.sqrt(V0 * V0 + 2 * GRAV * dy));
-    const reach = Math.min(len, (V0 * (since / 1000) + 0.5 * GRAV * (since / 1000) ** 2) * 1.2);
-
+  if (brew.level > 0.001) {
+    const grad = ctx.createLinearGradient(0, base - 6, 0, Math.min(h, base + 320));
+    grad.addColorStop(0, cssRgba(accent, 0.03));
+    grad.addColorStop(0.35, cssRgba(accent, 0.13));
+    grad.addColorStop(1, cssRgba(accent, 0.2));
+    ctx.fillStyle = grad;
     ctx.beginPath();
-    for (let dy = 0; dy <= reach; dy += 6) ctx.lineTo(xAt(dy) - widthAt(dy) / 2, top + dy);
-    for (let dy = reach; dy >= 0; dy -= 6) ctx.lineTo(xAt(dy) + widthAt(dy) / 2, top + dy);
+    ctx.moveTo(0, yAt(0));
+    for (let x = 0; x <= w; x += 4) ctx.lineTo(x, yAt(x));
+    ctx.lineTo(w, h);
+    ctx.lineTo(0, h);
     ctx.closePath();
-    ctx.fillStyle = cssRgba(accent, 0.4 * fade);
     ctx.fill();
-    /* 水らしさは、筋の片側に淡い照りを1本入れると出る。強く引くと
-       針金のように見えるので、太めに薄く */
-    ctx.strokeStyle = cssRgba(accent, 0.24 * fade);
-    ctx.lineWidth = 2.6;
-    ctx.beginPath();
-    for (let dy = 2; dy <= reach; dy += 6) ctx.lineTo(xAt(dy) - widthAt(dy) * 0.22, top + dy);
-    ctx.stroke();
-    ctx.strokeStyle = cssRgba(accent, 0.16 * fade);
+
+    ctx.strokeStyle = cssRgba(accent, 0.22);
     ctx.lineWidth = 1.4;
     ctx.beginPath();
-    for (let dy = 2; dy <= reach; dy += 6) ctx.lineTo(xAt(dy) + widthAt(dy) * 0.34, top + dy);
+    ctx.moveTo(0, yAt(0));
+    for (let x = 0; x <= w; x += 4) ctx.lineTo(x, yAt(x));
     ctx.stroke();
-
-    /* 出だしを溶け込ませる。急に線が始まると、そこだけ作り物に見える */
-    ctx.save();
-    ctx.globalCompositeOperation = "destination-out";
-    const fadeTop = ctx.createLinearGradient(0, top - 2, 0, top + 26);
-    fadeTop.addColorStop(0, "rgba(0,0,0,1)");
-    fadeTop.addColorStop(1, "rgba(0,0,0,0)");
-    ctx.fillStyle = fadeTop;
-    ctx.fillRect(px - w0 * 1.5, top - 2, w0 * 3, 28);
-    ctx.restore();
-
-    /* 細くなった先はちぎれて粒になる */
-    if (reach >= len * 0.8) {
-      for (let i = 0; i < 3; i++) {
-        const dy = len * (0.82 + i * 0.06) + ((since / 6 + i * 23) % 26);
-        if (dy >= len) continue;
-        ctx.fillStyle = cssRgba(accent, 0.24 * fade);
-        ctx.beginPath();
-        ctx.ellipse(xAt(dy), top + dy, widthAt(dy) * 0.5, widthAt(dy) * 0.8, 0, 0, TAU);
-        ctx.fill();
-      }
-    }
-
-    /* 着水。波紋を撒き、当たった場所を少し明るくする */
-    if (reach >= len && !p.landed) {
-      p.landed = true;
-      brew.ripples.push({ t0: now, x: px });
-      setTimeout(() => brew.ripples.push({ t0: performance.now(), x: px }), 260);
-    }
-    if (p.landed) {
-      const age = (since - 200) / 1000;
-      /* 当たった場所は、泡が溜まって明るく見える */
-      ctx.fillStyle = cssRgba(accent, 0.12 * fade);
-      ctx.beginPath();
-      ctx.ellipse(px, surface + 2, 15 + age * 18, 4 + age * 3.4, 0, 0, TAU);
-      ctx.fill();
-      /* 跳ね上がりの冠。落ちてすぐの一瞬だけ */
-      const crown = Math.max(0, 1 - age * 3.2);
-      if (crown > 0) {
-        ctx.strokeStyle = cssRgba(accent, 0.34 * crown * fade);
-        ctx.lineWidth = 2;
-        for (const dir of [-1, 1]) {
-          ctx.beginPath();
-          ctx.moveTo(px + dir * 3, surface);
-          ctx.quadraticCurveTo(px + dir * (10 + 16 * (1 - crown)), surface - 16 * crown,
-                               px + dir * (17 + 22 * (1 - crown)), surface - 2);
-          ctx.stroke();
-        }
-      }
-    }
+    ctx.strokeStyle = cssRgba(accent, 0.07);
+    ctx.lineWidth = 5;
+    ctx.beginPath();
+    ctx.moveTo(0, yAt(0) + 6);
+    for (let x = 0; x <= w; x += 6) ctx.lineTo(x, yAt(x) + 6);
+    ctx.stroke();
   }
 
+  /* --- 落ちる雫 --- */
+  /* 雫は画面のいちばん上から入り、円や文字の裏を素通りして水面へ落ちる */
+  for (const d of brew.drops) {
+    d.v += DROP_G * dt;
+    d.y += d.v * dt;
+    const surface = yAt(d.x);
+    if (d.y >= surface) {
+      brew.level += d.q;
+      brew.ripples.push({ t0: now, x: d.x, power: 0.5 + Math.random() * 0.3 });
+      d.done = true;
+      continue;
+    }
+    /* 速いほど縦に伸びる。落下の筋も薄く引く */
+    const stretch = Math.min(3.2, 1 + d.v / 420);
+    ctx.strokeStyle = cssRgba(accent, 0.18);
+    ctx.lineWidth = d.r * 0.7;
+    ctx.beginPath();
+    ctx.moveTo(d.x, d.y - d.r * stretch * 3.4);
+    ctx.lineTo(d.x, d.y);
+    ctx.stroke();
+    ctx.fillStyle = cssRgba(accent, 0.5);
+    ctx.beginPath();
+    ctx.ellipse(d.x, d.y, d.r, d.r * stretch, 0, 0, TAU);
+    ctx.fill();
+  }
+  brew.drops = brew.drops.filter((d) => !d.done);
+
   /* --- 湯気 --- */
-  /* 線を引くと作り物に見える。昇りながら膨らんで薄れる粒を撒く */
-  if (brew.level > 0.03 && now - brew.puffAt > 150) {
+  /* 白く。背景と同じ白ではなく、少し明るい白で浮かせる */
+  if (brew.level > 0.02 && now - brew.puffAt > 150) {
     brew.puffAt = now;
-    const px = w * (0.3 + Math.random() * 0.4);
+    const px = w * (0.28 + Math.random() * 0.44);
     brew.puffs.push({
       x: px, y: yAt(px) - 4, born: now,
       life: 3400 + Math.random() * 1800,
@@ -1072,38 +1060,73 @@ function drawBrewBackground(now) {
     });
   }
   brew.puffs = brew.puffs.filter((p) => now - p.born < p.life);
+  const steamPeak = isDarkNow() ? 0.17 : 0.5;
   for (const p of brew.puffs) {
     const age = (now - p.born) / p.life;
     const y = p.y - p.vy * ((now - p.born) / 1000) * (1 + age * 1.4);
     const x = p.x + Math.sin(age * 3.1 + p.seed) * 16 + p.drift * age;
     const r = p.r * (1 + age * 2.4);
-    /* 出はじめと消えぎわを薄く。いちばん濃いところでも、ごく淡い */
-    const a = 0.11 * Math.sin(Math.min(1, age * 1.15) * Math.PI) * Math.min(1, brew.level * 5);
-    if (a <= 0.002) continue;
-    /* 液面が上がってくると、古い粒が水中に取り残される。水の中に湯気は
-       立たないので、沈んだものは描かない */
-    if (y > yAt(x) - 4) continue;
+    const a = steamPeak * Math.sin(Math.min(1, age * 1.15) * Math.PI) * Math.min(1, brew.level * 5);
+    if (a <= 0.004) continue;
+    if (y > yAt(x) - 4) continue;          // 水中に湯気は立たない
     const g2 = ctx.createRadialGradient(x, y, 0, x, y, r);
-    g2.addColorStop(0, cssRgba(accent, a));
-    g2.addColorStop(0.55, cssRgba(accent, a * 0.45));
-    g2.addColorStop(1, cssRgba(accent, 0));
+    g2.addColorStop(0, `rgba(255,255,255,${a})`);
+    g2.addColorStop(0.55, `rgba(255,255,255,${a * 0.42})`);
+    g2.addColorStop(1, "rgba(255,255,255,0)");
     ctx.fillStyle = g2;
     ctx.beginPath();
     ctx.arc(x, y, r, 0, TAU);
     ctx.fill();
   }
+
+  /* --- 目盛り --- */
+  /* ビーカーの目盛りは器の側にあるので、液より手前に引く */
+  if (brew.total > 0 && brew.marks.length) {
+    ctx.font = '11px ' + (getComputedStyle(document.documentElement)
+      .getPropertyValue("--font-mono") || "monospace");
+    ctx.textAlign = "right";
+    ctx.textBaseline = "middle";
+    for (const ml of brew.marks) {
+      const y = h - (ml / brew.total) * LEVEL_MAX * h;
+      if (y < 26 || y > h - 6) continue;
+      ctx.strokeStyle = cssRgba(accent, 0.4);
+      ctx.lineWidth = 1.2;
+      ctx.beginPath();
+      ctx.moveTo(w - 14, y);
+      ctx.lineTo(w - 34, y);
+      ctx.stroke();
+      ctx.fillStyle = cssRgba(accent, 0.55);
+      ctx.fillText(String(ml), w - 40, y);
+    }
+    /* いちばん上の目盛りにだけ単位を添える。上に出すとアップバーに
+       隠れるので、目盛りの下に置く */
+    const topMl = Math.max(...brew.marks);
+    const topY = h - (topMl / brew.total) * LEVEL_MAX * h;
+    if (topY > 20) {
+      ctx.fillStyle = cssRgba(accent, 0.4);
+      ctx.fillText("ml", w - 40, topY + 15);
+    }
+  }
 }
 
 /* ---------- タイマーの見た目 ---------- */
+/* ボタンは常に1行に収める。淹れ終わりで行が増えると、上の表示がずれる */
 function renderTimerStatic() {
   const free = !timer.recipe;
+  const st = timer.state;
+  const show = (id, on) => { $(id).hidden = !on; };
+
   const toggle = $("timer-toggle");
-  toggle.textContent = timer.state === "running" ? "Pause"
-    : timer.state === "paused" ? "Resume"
-    : timer.state === "done" ? "Again" : "Start";
-  toggle.classList.toggle("running", timer.state === "running");
-  $("timer-lap").hidden = !free || timer.state === "idle";
-  $("timer-to-log").hidden = !(timer.state === "done" || (free && timer.state !== "idle"));
+  toggle.textContent = st === "count" ? "Stop"
+    : st === "running" ? "Pause"
+    : st === "paused" ? "Resume" : "Start";
+  toggle.classList.toggle("running", st === "running" || st === "count");
+
+  show("timer-reset", st !== "done");
+  show("timer-finish", st === "done");
+  show("timer-lap", free && st === "running");
+  show("timer-toggle", st !== "done");
+  show("timer-to-log", st === "done" || (free && st === "paused"));
 }
 
 /* 1周を手順ごとの区画に割る。区画の幅がその手順の長さ */
@@ -1121,19 +1144,39 @@ function dialSectors(steps, total, elapsedSec, curIdx) {
 }
 
 function renderTimerLive() {
-  const elapsedSec = timerElapsedMs() / 1000;
   const main = $("dial-main");
   const sub = $("dial-sub");
+  const note = $("timer-note");
+
+  /* 開始前の数え下げ */
+  if (timer.state === "count") {
+    const left = Math.max(0, timer.countUntil - Date.now());
+    if (left <= 0) { beginRun(); return; }
+    drawSectorDial(timer.recipe
+      ? dialSectors(scaledSteps(), timerTotalSec(), 0, -1)
+      : [{ from: 0, to: 1, state: "next", fill: 0 }]);
+    main.textContent = String(Math.ceil(left / 1000));
+    main.lang = ""; sub.lang = "";
+    main.classList.remove("with-unit");
+    main.classList.add("waiting");
+    sub.textContent = "";
+    note.textContent = "";
+    $("timer-elapsed").textContent = "0:00";
+    return;
+  }
+
+  const elapsedSec = timerElapsedMs() / 1000;
   $("timer-elapsed").textContent = fmtClock(elapsedSec);
 
   if (!timer.recipe) {
-    /* レシピなしのときは、1分で一周する区画ひとつだけ */
     drawSectorDial([{ from: 0, to: 1, state: "now", fill: (elapsedSec % 60) / 60 }]);
     main.textContent = fmtClock(elapsedSec);
     main.lang = ""; sub.lang = "";
     main.classList.remove("with-unit");
     sub.textContent = timer.laps.length ? `${timer.laps.length}` : "";
+    note.textContent = "";
     $("timer-elapsed").textContent = "";
+    brew.total = 0; brew.marks = [];
     return;
   }
 
@@ -1143,41 +1186,57 @@ function renderTimerLive() {
 
   let curIdx = -1;
   for (let i = 0; i < steps.length; i++) if (steps[i].at <= elapsedSec) curIdx = i; else break;
+  const idle = timer.state === "idle";
 
-  drawSectorDial(dialSectors(steps, total, elapsedSec, timer.state === "idle" ? -1 : curIdx));
+  drawSectorDial(dialSectors(steps, total, elapsedSec, idle ? -1 : curIdx));
 
-  /* 主役は「この回に注ぐ量」。始める前は、これから注ぐ1投目を見せておく */
-  const showIdx = timer.state === "idle"
-    ? steps.findIndex((st) => st.kind === "pour")
-    : curIdx;
-  const shown = showIdx >= 0 ? steps[showIdx] : null;
-  const amount = shown ? pourAmount(steps, showIdx) : 0;
+  /* 円の中はいつも「注ぐ量」。注ぐ以外の手順のあいだは、次に注ぐ量を
+     薄く出して備えられるようにする。指示のことばは時間の下へ回す */
+  const shownIdx = idle ? steps.findIndex((st) => st.kind === "pour") : curIdx;
+  const shown = shownIdx >= 0 ? steps[shownIdx] : null;
+  const isPour = shown && shown.kind === "pour";
+  let amountIdx = shownIdx;
+  if (!isPour) {
+    const nextPour = steps.findIndex((st, i) => i > curIdx && st.kind === "pour");
+    amountIdx = nextPour;
+  }
+  const amount = amountIdx >= 0 ? pourAmount(steps, amountIdx) : 0;
   const pours = pourTotal(steps);
 
   if (timer.state === "done") {
     main.textContent = "Fertig";
     main.lang = "de";
-    main.classList.remove("with-unit");
+    main.classList.remove("with-unit", "waiting");
     sub.textContent = "Extraktion beendet";
     sub.lang = "de";
-  } else if (amount) {
-    main.innerHTML = `${amount}<span class="unit">g</span>`;
-    main.lang = ""; sub.lang = "";
-    main.classList.add("with-unit");
-    sub.textContent = pours > 1 ? `${pourIndex(steps, showIdx)} / ${pours}` : "";
+    note.textContent = "";
   } else {
-    main.textContent = shown ? (shown.label || KIND_LABEL[shown.kind] || "—") : "—";
     main.lang = ""; sub.lang = "";
-    main.classList.remove("with-unit");
-    sub.textContent = "";
+    if (amount) {
+      main.innerHTML = `${amount}<span class="unit">g</span>`;
+      main.classList.add("with-unit");
+    } else {
+      main.textContent = recipeWater() ? `${recipeWater()}` : "—";
+      main.classList.remove("with-unit");
+    }
+    main.classList.toggle("waiting", idle || !isPour);
+    sub.textContent = amountIdx >= 0 && pours > 1
+      ? `${pourIndex(steps, amountIdx)} / ${pours}` : "";
+    /* 「氷を入れてください」のような指示は、時間の下に */
+    const first = steps[0];
+    const instruction = idle
+      ? (first && first.kind !== "pour" ? first : null)
+      : (shown && !isPour ? shown : null);
+    note.textContent = instruction ? (instruction.label || KIND_LABEL[instruction.kind] || "") : "";
   }
-  main.classList.toggle("waiting", timer.state === "idle");
 
-  /* 背景の液面は、注いだ量そのもの */
+  /* 背景。注いだ量と、投ごとの目盛り */
   const goal = recipeWater();
   let poured = 0;
   for (let i = 0; i <= curIdx; i++) if (steps[i].water) poured = steps[i].water;
-  brew.target = timer.state === "idle" || !goal ? 0 : Math.min(1, poured / goal);
+  brew.target = idle || !goal ? 0 : Math.min(1, poured / goal);
+  brew.total = goal;
+  brew.marks = steps.filter((st) => st.water).map((st) => st.water);
 
   if (timer.state === "running" && elapsedSec >= total) finishTimer();
 }
@@ -1189,8 +1248,14 @@ function escapeHtml(text) {
 
 /* タイマーの操作 */
 $("timer-toggle").addEventListener("click", () => {
+  if (timer.state === "count") { resetTimer(); return; }   // 数え下げの取り消し
   if (timer.state === "running") pauseTimer();
   else startTimer();
+});
+$("timer-finish").addEventListener("click", () => {
+  stopTimerLoop();
+  showScreen("brew");
+  renderHome();
 });
 $("timer-reset").addEventListener("click", resetTimer);
 $("timer-close").addEventListener("click", () => {
@@ -1789,6 +1854,8 @@ function renderSettings() {
   $("s-wakelock").checked = settings.wakelock;
   $("s-volume").value = String(settings.volume);
   $("s-volume-out").textContent = `${settings.volume}%`;
+  $("s-countdown").value = String(settings.countdown);
+  $("s-countdown-out").textContent = settings.countdown ? `${settings.countdown} s` : "off";
   $("s-theme").value = settings.theme;
   renderRoastPicker();
   $("app-version").textContent = `v${APP_VERSION}`;
@@ -1807,6 +1874,11 @@ $("s-volume").addEventListener("input", (e) => {
   $("s-volume-out").textContent = `${settings.volume}%`;
 });
 $("s-volume").addEventListener("change", saveSettings);
+$("s-countdown").addEventListener("input", (e) => {
+  settings.countdown = Number(e.target.value);
+  $("s-countdown-out").textContent = settings.countdown ? `${settings.countdown} s` : "off";
+});
+$("s-countdown").addEventListener("change", saveSettings);
 $("s-test-chime").addEventListener("click", () => playSoundNow("step", 2));
 /* 見本の丸は、いま見えている面での色をそのまま塗る。選んだ結果が
    そのとおりに出るほうが、選びやすい */
