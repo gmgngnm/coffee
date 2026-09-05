@@ -1,14 +1,13 @@
 /* ==================================================================== *
- *  BrewNote — コーヒーの淹れ方と味の記録帳、そして注ぐタイミングを
- *  知らせるタイマー。
+ *  Coffeerence — coffee と coherence。淹れ方と味を記録し、注ぐ
+ *  タイミングを知らせるタイマーを持つ、コーヒーの記録帳。
  *
  *  作りは意図的に素朴に保っている。ビルド工程を持たず、index.html から
  *  この1ファイルを読むだけで動く。
  *
  *  記録はこの端末の IndexedDB にだけ置く。アカウントも、送信先の
  *  サーバも持たない。淹れた記録がどこかへ流れていくことはない。
- *  端末を移るとき・残しておきたいときは、設定から JSON か CSV で
- *  書き出す（JSONはそのまま読み戻せる、CSVは表計算で開ける）。
+ *  持ち出すときは、設定からCSVで書き出す。
  *
  *   1. 下ごしらえ（定数・小道具）
  *   2. IndexedDB
@@ -20,7 +19,11 @@
  *   8. 起動
  * ==================================================================== */
 
-const APP_VERSION = "1.1.0";
+const APP_VERSION = "1.2.0";
+
+/* ホームのロゴの下に #002 の形で出す、mainへマージした回数。
+   マージのたびに1つ増やす（この見た目になるまでに何回積んだか） */
+const MERGE_COUNT = 3;
 
 /* ------------------------------------------------------------------ *
  * 1. 下ごしらえ
@@ -130,6 +133,8 @@ function confirmAsk(text) {
  *    レシピ・記録・設定を置く。全部合わせても小さいので、起動時に
  *    まとめてメモリへ読み込み、以降は同期的に扱う。
  * ------------------------------------------------------------------ */
+/* 名前は BrewNote 時代のまま。ここを変えると、すでに端末に入っている
+   記録が別の入れ物に取り残されてしまう。外から見える名前ではない */
 const DB_NAME = "brewnote";
 const DB_VERSION = 1;
 let dbPromise = null;
@@ -209,7 +214,7 @@ function applyTheme() {
   const dark = settings.theme === "dark"
     || (settings.theme === "auto" && matchMedia("(prefers-color-scheme: dark)").matches);
   const meta = document.querySelector('meta[name="theme-color"]');
-  if (meta) meta.setAttribute("content", dark ? "#15100C" : "#4A2C1D");
+  if (meta) meta.setAttribute("content", dark ? "#101711" : "#1F6F63");
 }
 
 async function saveSettings() {
@@ -1523,10 +1528,9 @@ $("s-theme").addEventListener("change", async (e) => {
   await saveSettings();
 });
 
-/* ---------- 書き出しと読み込み ---------- *
- *  記録はこの端末の中にしかない。だから持ち出す道を2つ用意する。
- *  JSON は自分で読み戻すためのもの（形をそのまま保つ）。
- *  CSV は表計算やほかの道具へ渡すためのもの（1杯が1行になる）。
+/* ---------- CSVで持ち出す ---------- *
+ *  記録はこの端末の中にしかないので、持ち出す道を用意する。1杯が1行、
+ *  1レシピが1行の表にして、表計算ソフトへ渡す。
  * ------------------------------------------------------------------ */
 function downloadFile(filename, text, mime) {
   const blob = new Blob([text], { type: mime });
@@ -1593,68 +1597,19 @@ function recipesCsv() {
   return toCsv(headers, rows);
 }
 
-$("s-export").addEventListener("click", () => {
-  const payload = {
-    app: "BrewNote", version: APP_VERSION, exportedAt: new Date().toISOString(),
-    recipes, brews, settings,
-  };
-  downloadFile(`brewnote-${today()}.json`, JSON.stringify(payload, null, 2), "application/json");
-  toast("書き出しました");
-});
-
 $("s-export-csv").addEventListener("click", () => {
-  if (!liveBrews().length) { toast("書き出せる記録がまだありません"); return; }
-  downloadFile(`brewnote-records-${today()}.csv`, brewsCsv(), "text/csv;charset=utf-8");
-  toast(`記録${liveBrews().length}件をCSVにしました`);
+  const n = liveBrews().length;
+  if (!n) { toast("書き出せる記録がまだありません"); return; }
+  downloadFile(`coffeerence-records-${today()}.csv`, brewsCsv(), "text/csv;charset=utf-8");
+  toast(`記録${n}件をCSVにしました`);
 });
 
 $("s-export-recipes-csv").addEventListener("click", () => {
-  if (!liveRecipes().length) { toast("書き出せるレシピがありません"); return; }
-  downloadFile(`brewnote-recipes-${today()}.csv`, recipesCsv(), "text/csv;charset=utf-8");
-  toast(`レシピ${liveRecipes().length}件をCSVにしました`);
+  const n = liveRecipes().length;
+  if (!n) { toast("書き出せるレシピがありません"); return; }
+  downloadFile(`coffeerence-recipes-${today()}.csv`, recipesCsv(), "text/csv;charset=utf-8");
+  toast(`レシピ${n}件をCSVにしました`);
 });
-
-$("s-import").addEventListener("click", () => $("s-import-file").click());
-$("s-import-file").addEventListener("change", async (e) => {
-  const file = e.target.files?.[0];
-  e.target.value = "";
-  if (!file) return;
-  try {
-    const data = JSON.parse(await file.text());
-    const added = await mergeImported(data);
-    toast(`読み込みました（レシピ${added.recipes}件 / 記録${added.brews}件）`);
-    renderHome(); renderLog(); renderRecipes(); renderSettings();
-  } catch (err) {
-    console.warn("読み込みに失敗しました:", err);
-    toast("このファイルは読み込めませんでした");
-  }
-});
-
-/* 同じidがあれば新しいほうを残す。書き出したものを別の端末で読んでも
-   二重にならないように */
-async function mergeImported(data) {
-  const count = { recipes: 0, brews: 0 };
-  for (const [store, incoming] of [["recipes", data.recipes], ["brews", data.brews]]) {
-    if (!Array.isArray(incoming)) continue;
-    const list = store === "recipes" ? recipes : brews;
-    const write = [];
-    for (const raw of incoming) {
-      if (!raw?.id) continue;
-      const rec = { ...raw };
-      const i = list.findIndex((x) => x.id === rec.id);
-      if (i >= 0) {
-        if ((rec.updatedAt || 0) <= (list[i].updatedAt || 0)) continue;
-        list[i] = rec;
-      } else {
-        list.push(rec);
-      }
-      write.push(rec);
-      count[store]++;
-    }
-    await idbPutMany(store, write);
-  }
-  return count;
-}
 
 $("s-restore-recipes").addEventListener("click", async () => {
   const existing = new Set(liveRecipes().map((r) => r.name));
@@ -1712,6 +1667,7 @@ async function boot() {
     await kvSet("seeded", true);
   }
 
+  $("build-tag").textContent = `#${String(MERGE_COUNT).padStart(3, "0")}`;
   syncMuteIcon();
   renderHome();
   renderLog();
