@@ -76,15 +76,19 @@
         </div>
       </div>
       <div class="elapsed mono" id="timer-elapsed">0:00</div>
+      <!-- 「氷を入れてください」のような、注ぐ以外の指示はここに出す -->
+      <div class="timer-note" id="timer-note"></div>
     </div>
 
+    <!-- ボタンは常に1行。淹れ終わりで行が増えると、上の表示がずれる -->
     <div class="timer-foot">
       <div class="controls">
         <button class="ctrl-btn secondary" id="timer-reset" type="button">Reset</button>
-        <button class="ctrl-btn primary" id="timer-toggle" type="button">Start</button>
+        <button class="ctrl-btn secondary" id="timer-finish" type="button" hidden>Finish</button>
         <button class="ctrl-btn secondary" id="timer-lap" type="button" hidden>Poured</button>
+        <button class="ctrl-btn primary" id="timer-toggle" type="button">Start</button>
+        <button class="ctrl-btn primary" id="timer-to-log" type="button" hidden>Log</button>
       </div>
-      <button class="wide-btn primary" id="timer-to-log" type="button" hidden>Log this cup</button>
     </div>
   </section>
 
@@ -350,6 +354,10 @@
         <span><strong>Keep awake</strong><small>Screen stays on while brewing</small></span>
         <input type="checkbox" id="s-wakelock" checked>
       </label>
+      <div class="field">
+        <label for="s-countdown">Countdown before start <span class="mono" id="s-countdown-out">3 s</span></label>
+        <input id="s-countdown" type="range" min="0" max="10" step="1" value="3">
+      </div>
       <div class="field">
         <label for="s-volume">Volume <span class="mono" id="s-volume-out">70%</span></label>
         <input id="s-volume" type="range" min="0" max="100" step="5" value="70">
