@@ -210,59 +210,54 @@ input,select,textarea{font-family:inherit;}
 .chip:active{transform:scale(.96);}
 .chip.active{border-color:var(--accent);color:var(--accent-ink);background:var(--accent-soft);font-weight:700;}
 
-/* ---------- タイマー ---------- */
+/* ---------- タイマー ---------- *
+ *  円を画面の中心に置き、その下に経過だけを大きく出す。
+ *  背景では、注ぐたびに液面が迫り上がる（app.js の drawBrewBackground）
+ * ------------------------------------------------------------------ */
+.screen-timer{position:relative;overflow:hidden;}
+.brew-bg{
+  position:absolute;inset:0;width:100%;height:100%;
+  z-index:0;pointer-events:none;
+}
+.screen-timer .appbar,
+.screen-timer .timer-body,
+.screen-timer .timer-foot{position:relative;z-index:1;}
+.screen-timer .appbar{background:none;}
+
 .timer-title{
   flex:1;text-align:center;font-family:var(--font-ui);font-size:16px;
   overflow:hidden;text-overflow:ellipsis;white-space:nowrap;
 }
-.timer-body{display:flex;flex-direction:column;}
-.dial-wrap{position:relative;width:min(74vw,278px);aspect-ratio:1;margin:2px auto 6px;}
-/* 輪は板ではなく円筒として、奥行きごと canvas に描く（app.js の drawDial）。
-   縦軸まわりに回るので、真横を向いても太さのぶんの帯として見え続ける */
+.timer-body{
+  flex:1;display:flex;flex-direction:column;align-items:center;justify-content:center;
+  gap:26px;padding:0 18px;
+}
+.timer-foot{padding:0 18px calc(24px + env(safe-area-inset-bottom));}
+
+.dial-wrap{position:relative;width:min(72vw,272px);aspect-ratio:1;}
 .dial{display:block;width:100%;height:100%;}
 .dial-center{
   position:absolute;inset:0;display:flex;flex-direction:column;
-  align-items:center;justify-content:center;gap:4px;padding:0 18px;
+  align-items:center;justify-content:center;gap:6px;padding:0 20px;
 }
-/* この回に注ぐ量。淹れている最中に、目を上げただけで読める大きさにする */
+/* この回に注ぐ量。淹れている最中に、目を上げただけで読める大きさに */
 .dial-main{
-  font-size:64px;font-weight:400;letter-spacing:-2px;line-height:1;color:var(--ink);
+  font-size:62px;font-weight:400;letter-spacing:-2px;line-height:1;color:var(--ink);
   display:flex;align-items:baseline;justify-content:center;
 }
 .dial-main.waiting{color:var(--ink-faint);}
 .dial-main .unit{
   font-family:var(--font-ui);font-size:20px;letter-spacing:0;color:var(--ink-faint);margin-left:5px;
 }
-/* 数字にならない手順（混ぜる・押す）は、ことばのほうを主役にする */
+/* 数字にならない手順（混ぜる・押す）や、淹れ終わりのことば */
 .dial-main:not(.with-unit){font-size:34px;letter-spacing:.01em;font-family:var(--font-ui);}
-.dial-sub{font-size:14px;color:var(--ink-soft);text-align:center;}
+.dial-sub{font-size:13px;color:var(--ink-faint);text-align:center;font-family:var(--font-mono);}
 
-/* 何投目かは点で示す。ことばを増やさずに数が分かる */
-.pour-dots{display:flex;justify-content:center;gap:9px;margin-top:16px;min-height:10px;}
-.pour-dots .pd{
-  width:9px;height:9px;border-radius:50%;background:var(--line);
-  transition:background .2s ease, transform .2s ease;
+.elapsed{
+  font-size:38px;font-weight:300;letter-spacing:-1px;color:var(--ink-soft);line-height:1;
 }
-.pour-dots .pd.on{background:var(--accent);}
-.pour-dots .pd.now{transform:scale(1.45);}
 
-.timer-meta{
-  display:flex;align-items:baseline;justify-content:center;gap:9px;
-  margin-top:14px;font-size:13px;color:var(--ink-soft);min-height:20px;
-}
-.timer-meta .dim{color:var(--ink-faint);}
-.timer-meta .cd{color:var(--accent);font-size:17px;min-width:22px;text-align:right;}
-.now-step{text-align:center;margin-top:4px;}
-.now-kind{
-  display:inline-block;font-size:11px;letter-spacing:.08em;color:var(--accent);
-  background:var(--accent-soft);border-radius:999px;padding:3px 11px;margin-bottom:7px;
-}
-.now-label{font-family:var(--font-ui);font-size:23px;line-height:1.3;letter-spacing:.02em;}
-.now-water{font-size:14px;color:var(--ink-soft);margin-top:4px;}
-.next-step{text-align:center;font-size:12.5px;color:var(--ink-faint);margin-top:8px;min-height:18px;}
-.next-step .cd{font-family:var(--font-mono);color:var(--accent);font-weight:500;}
-
-.controls{display:flex;gap:10px;margin-top:18px;}
+.controls{display:flex;gap:10px;}
 .ctrl-btn{
   flex:1;border-radius:999px;padding:15px 10px;font-size:14px;font-weight:700;
   font-family:var(--font-ui);
@@ -273,17 +268,6 @@ input,select,textarea{font-family:inherit;}
 .ctrl-btn.danger{background:var(--danger);border-color:var(--danger);color:#fff;}
 .ctrl-btn:active{opacity:.75;}
 
-.step-track{display:flex;flex-direction:column;gap:2px;margin-top:22px;}
-.track-step{
-  display:flex;align-items:center;gap:11px;padding:9px 12px;border-radius:12px;
-  font-size:13.5px;color:var(--ink-faint);
-}
-.track-step .ts-time{font-family:var(--font-mono);font-size:12.5px;width:44px;flex-shrink:0;}
-.track-step .ts-label{flex:1;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;}
-.track-step .ts-water{font-family:var(--font-mono);font-size:12.5px;}
-.track-step.done{color:var(--ink-faint);opacity:.55;}
-.track-step.done .ts-label{text-decoration:line-through;text-decoration-color:var(--line);}
-.track-step.current{background:var(--accent-soft);color:var(--accent-ink);font-weight:700;}
 /* ---------- 記録の詳細 ---------- */
 .detail-hero{
   background:var(--surface);border:1px solid var(--line);border-radius:18px;
