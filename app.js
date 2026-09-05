@@ -19,11 +19,11 @@
  *   8. 起動
  * ==================================================================== */
 
-const APP_VERSION = "1.3.0";
+const APP_VERSION = "1.4.0";
 
 /* ホームのロゴの下に #002 の形で出す、mainへマージした回数。
    マージのたびに1つ増やす（この見た目になるまでに何回積んだか） */
-const MERGE_COUNT = 4;
+const MERGE_COUNT = 5;
 
 /* ------------------------------------------------------------------ *
  * 1. 下ごしらえ
@@ -61,20 +61,29 @@ function parseClock(text) {
   return Number.isFinite(n) ? Math.round(n) : null;
 }
 
+/* 英語は1つのときだけ語尾が変わる。数と語をまとめて組む */
+function plural(n, word) {
+  return `${n} ${word}${n === 1 ? "" : "s"}`;
+}
+
 function num(value, fallback = null) {
   const n = Number(value);
   return Number.isFinite(n) ? n : fallback;
 }
 
+const WEEKDAYS = ["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"];
+const MONTHS = ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"];
+const MONTHS_FULL = ["January", "February", "March", "April", "May", "June",
+  "July", "August", "September", "October", "November", "December"];
+
 function fmtDate(ms) {
   const d = new Date(ms);
-  const w = "日月火水木金土"[d.getDay()];
-  return `${d.getMonth() + 1}/${d.getDate()}(${w})`;
+  return `${WEEKDAYS[d.getDay()]} ${d.getDate()} ${MONTHS[d.getMonth()]}`;
 }
 function fmtDateTime(ms) {
   const d = new Date(ms);
-  return `${d.getFullYear()}/${String(d.getMonth() + 1).padStart(2, "0")}/${String(d.getDate()).padStart(2, "0")} `
-       + `${String(d.getHours()).padStart(2, "0")}:${String(d.getMinutes()).padStart(2, "0")}`;
+  const p = (n) => String(n).padStart(2, "0");
+  return `${d.getDate()} ${MONTHS[d.getMonth()]} ${d.getFullYear()}, ${p(d.getHours())}:${p(d.getMinutes())}`;
 }
 /* <input type="datetime-local"> は端末のローカル時刻の文字列を欲しがる */
 function toLocalInput(ms) {
@@ -201,11 +210,11 @@ const kvSet = (k, v) => idbPut("kv", { k, v });
    暗い面では暗い文字を載せるので明るめの側を使う。どの段も、それぞれの
    面に対して4.5:1以上の明暗差がある */
 const ROASTS = [
-  { id: "light",       name: "浅煎り",   light: "#956026", dark: "#EAB77C" },
-  { id: "medium-light", name: "中浅煎り", light: "#8A5324", dark: "#DFA666" },
-  { id: "medium",      name: "中煎り",   light: "#7C4522", dark: "#D39455" },
-  { id: "medium-dark", name: "中深煎り", light: "#65351E", dark: "#C7864B" },
-  { id: "dark",        name: "深煎り",   light: "#4B2517", dark: "#BA7A45" },
+  { id: "light",       name: "Light",       light: "#956026", dark: "#EAB77C" },
+  { id: "medium-light", name: "Medium-light", light: "#8A5324", dark: "#DFA666" },
+  { id: "medium",      name: "Medium",      light: "#7C4522", dark: "#D39455" },
+  { id: "medium-dark", name: "Medium-dark", light: "#65351E", dark: "#C7864B" },
+  { id: "dark",        name: "Dark",        light: "#4B2517", dark: "#BA7A45" },
 ];
 const findRoast = (id) => ROASTS.find((r) => r.id === id) || ROASTS[2];
 
@@ -259,9 +268,9 @@ const findBrew    = (id) => brews.find((b) => b.id === id && !b.deleted) || null
 function emptyRecipe() {
   const now = Date.now();
   return {
-    id: newId(), name: "", method: "V60", grind: "中細",
+    id: newId(), name: "", method: "V60", grind: "Medium-fine",
     doseG: 15, waterG: 240, tempC: 92,
-    steps: [{ at: 0, kind: "pour", water: 45, label: "蒸らし", note: "" }],
+    steps: [{ at: 0, kind: "pour", water: 45, label: "Bloom", note: "" }],
     totalSec: 180, memo: "",
     createdAt: now, updatedAt: now, usedAt: 0, deleted: false,
   };
@@ -314,40 +323,40 @@ function starterRecipes() {
     createdAt: now, updatedAt: now, usedAt: 0, deleted: false, starter: true,
   });
   return [
-    mk("4:6メソッド", "V60", "中粗", 20, 300, 93, 210, [
-      { at: 0,   kind: "pour", water: 60,  label: "1投目", note: "甘さを決める前半" },
-      { at: 45,  kind: "pour", water: 120, label: "2投目", note: "" },
-      { at: 90,  kind: "pour", water: 180, label: "3投目", note: "ここから後半・濃さを決める" },
-      { at: 135, kind: "pour", water: 240, label: "4投目", note: "" },
-      { at: 165, kind: "pour", water: 300, label: "5投目", note: "" },
-      { at: 210, kind: "finish", water: 0, label: "落としきり", note: "" },
-    ], "前半2投で甘さと酸味、後半3投で濃さを決める淹れ方。"),
-    mk("V60 ふつうの一杯", "V60", "中細", 15, 240, 92, 165, [
-      { at: 0,   kind: "pour", water: 45,  label: "蒸らし", note: "全体を湿らせて30秒待つ" },
-      { at: 30,  kind: "pour", water: 150, label: "2投目", note: "中心から円を描く" },
-      { at: 75,  kind: "pour", water: 240, label: "3投目", note: "" },
-      { at: 165, kind: "finish", water: 0, label: "落としきり", note: "" },
-    ], "迷ったらこれ。1:16 の素直な配合。"),
-    mk("フレンチプレス", "フレンチプレス", "粗", 16, 260, 94, 270, [
-      { at: 0,   kind: "pour",   water: 260, label: "一気に注ぐ", note: "粉全体に行き渡らせる" },
-      { at: 60,  kind: "stir",   water: 0,   label: "泡を沈める", note: "表面をスプーンで軽く崩す" },
-      { at: 240, kind: "plunge", water: 0,   label: "プランジャーを押す", note: "ゆっくり最後まで" },
-      { at: 270, kind: "finish", water: 0,   label: "注ぎ分ける", note: "置きっぱなしにしない" },
-    ], "浸けておくだけ。粗挽きで4分。"),
-    mk("エアロプレス（標準）", "エアロプレス", "中細", 16, 220, 85, 150, [
-      { at: 0,   kind: "pour",   water: 220, label: "注ぐ", note: "" },
-      { at: 15,  kind: "stir",   water: 0,   label: "10回かき混ぜる", note: "" },
-      { at: 90,  kind: "plunge", water: 0,   label: "押す", note: "30秒かけてゆっくり" },
-      { at: 150, kind: "finish", water: 0,   label: "できあがり", note: "" },
-    ], "湯温は低め。押す速さで表情が変わる。"),
-    mk("アイス（急冷）", "V60", "中細", 20, 200, 93, 165, [
-      { at: 0,   kind: "wait",   water: 0,   label: "氷100gをサーバーへ", note: "先に氷を入れておく" },
-      { at: 10,  kind: "pour",   water: 60,  label: "蒸らし", note: "" },
-      { at: 45,  kind: "pour",   water: 130, label: "2投目", note: "" },
-      { at: 90,  kind: "pour",   water: 200, label: "3投目", note: "" },
-      { at: 150, kind: "swirl",  water: 0,   label: "混ぜて急冷", note: "" },
-      { at: 165, kind: "finish", water: 0,   label: "できあがり", note: "" },
-    ], "湯200g＋氷100g。濃いめに落として一気に冷やす。"),
+    mk("4:6 Method", "V60", "Medium-coarse", 20, 300, 93, 210, [
+      { at: 0,   kind: "pour", water: 60,  label: "First pour", note: "The first half sets the sweetness" },
+      { at: 45,  kind: "pour", water: 120, label: "Second pour", note: "" },
+      { at: 90,  kind: "pour", water: 180, label: "Third pour", note: "The second half sets the strength" },
+      { at: 135, kind: "pour", water: 240, label: "Fourth pour", note: "" },
+      { at: 165, kind: "pour", water: 300, label: "Fifth pour", note: "" },
+      { at: 210, kind: "finish", water: 0, label: "Drawdown", note: "" },
+    ], "Two pours for sweetness and acidity, three more for strength."),
+    mk("V60 Everyday Cup", "V60", "Medium-fine", 15, 240, 92, 165, [
+      { at: 0,   kind: "pour", water: 45,  label: "Bloom", note: "Wet all the grounds and wait 30 s" },
+      { at: 30,  kind: "pour", water: 150, label: "Second pour", note: "Circles from the middle out" },
+      { at: 75,  kind: "pour", water: 240, label: "Third pour", note: "" },
+      { at: 165, kind: "finish", water: 0, label: "Drawdown", note: "" },
+    ], "The one to fall back on. A plain 1:16."),
+    mk("French Press", "French press", "Coarse", 16, 260, 94, 270, [
+      { at: 0,   kind: "pour",   water: 260, label: "Pour it all", note: "Reach every bit of the grounds" },
+      { at: 60,  kind: "stir",   water: 0,   label: "Break the crust", note: "Nudge the surface with a spoon" },
+      { at: 240, kind: "plunge", water: 0,   label: "Press the plunger", note: "Slowly, all the way down" },
+      { at: 270, kind: "finish", water: 0,   label: "Pour it out", note: "Do not leave it sitting" },
+    ], "Steep and wait. Coarse grind, four minutes."),
+    mk("AeroPress (standard)", "AeroPress", "Medium-fine", 16, 220, 85, 150, [
+      { at: 0,   kind: "pour",   water: 220, label: "Pour", note: "" },
+      { at: 15,  kind: "stir",   water: 0,   label: "Stir ten times", note: "" },
+      { at: 90,  kind: "plunge", water: 0,   label: "Press", note: "Take a slow 30 s" },
+      { at: 150, kind: "finish", water: 0,   label: "Ready", note: "" },
+    ], "Cooler water. How fast you press changes everything."),
+    mk("Iced (flash chilled)", "V60", "Medium-fine", 20, 200, 93, 165, [
+      { at: 0,   kind: "wait",   water: 0,   label: "100 g ice in the carafe", note: "Ice goes in first" },
+      { at: 10,  kind: "pour",   water: 60,  label: "Bloom", note: "" },
+      { at: 45,  kind: "pour",   water: 130, label: "Second pour", note: "" },
+      { at: 90,  kind: "pour",   water: 200, label: "Third pour", note: "" },
+      { at: 150, kind: "swirl",  water: 0,   label: "Swirl to chill", note: "" },
+      { at: 165, kind: "finish", water: 0,   label: "Ready", note: "" },
+    ], "200 g water over 100 g ice. Brew it strong, chill it fast."),
   ];
 }
 
@@ -443,7 +452,7 @@ function speak(text) {
   if (!settings.voice || !text || !window.speechSynthesis) return;
   try {
     const u = new SpeechSynthesisUtterance(text);
-    u.lang = "ja-JP";
+    u.lang = "en-US";
     u.rate = 1.05;
     u.volume = Math.max(0.2, volumeGain());
     speechSynthesis.cancel();
@@ -462,8 +471,8 @@ function buzz(pattern) {
  * 6. タイマー
  * ------------------------------------------------------------------ */
 const KIND_LABEL = {
-  pour: "注ぐ", wait: "待つ", stir: "混ぜる",
-  swirl: "ゆらす", plunge: "押す", finish: "できあがり",
+  pour: "Pour", wait: "Wait", stir: "Stir",
+  swirl: "Swirl", plunge: "Press", finish: "Ready",
 };
 
 const timer = {
@@ -494,7 +503,7 @@ function scaledSteps() {
     .sort((a, b) => a.at - b.at);
   if (!steps.some((s) => s.kind === "finish")) {
     const last = steps.length ? steps[steps.length - 1].at : 0;
-    steps.push({ at: Math.max(r.totalSec || 0, last + 30), kind: "finish", water: 0, label: "できあがり", note: "" });
+    steps.push({ at: Math.max(r.totalSec || 0, last + 30), kind: "finish", water: 0, label: "Ready", note: "" });
   }
   return steps;
 }
@@ -517,14 +526,15 @@ function pourIndex(steps, idx) {
 const pourTotal = (steps) => steps.filter((s) => s.kind === "pour").length;
 
 function stepSpeech(step, steps, idx) {
-  if (step.kind === "finish") return "できあがりです";
+  if (step.kind === "finish") return "Your coffee is ready";
   if (step.kind === "pour") {
     const n = pourIndex(steps, idx);
     const total = pourTotal(steps);
-    const head = step.label || `${n}投目`;
-    return step.water ? `${head}。${step.water}グラムまで` : `${head}。あと${total - n}投`;
+    const head = step.label || `Pour ${n}`;
+    return step.water ? `${head}. Up to ${step.water} grams`
+      : `${head}. ${total - n} more to go`;
   }
-  return step.label || KIND_LABEL[step.kind] || "次の手順";
+  return step.label || KIND_LABEL[step.kind] || "Next step";
 }
 
 /* 走り出す／再開するたびに、これから来る音を全部予約し直す */
@@ -574,7 +584,7 @@ function openTimer(recipe) {
   timer.firedIdx = -1;
   timer.laps = [];
   timer.startedAt = 0;
-  $("timer-title").textContent = recipe ? recipe.name : "レシピなしで計る";
+  $("timer-title").textContent = recipe ? recipe.name : "Free timer";
   renderTimerStatic();
   renderTimerLive();
   showScreen("timer");
@@ -712,10 +722,10 @@ function goBack() {
 function renderHome() {
   const hour = new Date().getHours();
   $("greeting").textContent =
-    hour < 5  ? "夜ふかしの一杯を" :
-    hour < 11 ? "おはようございます。今日の一杯を" :
-    hour < 17 ? "ひと息いれましょう" :
-                "今日はどう淹れますか";
+    hour < 5  ? "Noch ein Aufguss zu später Stunde?" :
+    hour < 11 ? "Guten Morgen. Der erste Aufguss." :
+    hour < 17 ? "Zeit für eine Pause." :
+                "Wie brühst du heute?";
 
   renderStats($("home-stats"), liveBrews());
 
@@ -723,7 +733,7 @@ function renderHome() {
   const box = $("home-recipes");
   box.innerHTML = "";
   if (!list.length) {
-    const empty = el("p", "empty-note", "レシピがまだありません。");
+    const empty = el("p", "empty-note", "No recipes yet.");
     box.appendChild(empty);
   }
   for (const r of list.slice(0, 4)) box.appendChild(recipeCard(r, false));
@@ -739,7 +749,7 @@ function recipeCard(recipe, withEdit) {
   const card = el("button", "recipe-card");
   card.type = "button";
   const body = el("div", "rc-body");
-  body.appendChild(el("div", "rc-name", recipe.name || "（名前なし）"));
+  body.appendChild(el("div", "rc-name", recipe.name || "(untitled)"));
   const meta = el("div", "rc-meta");
   const bits = [
     recipe.method || "",
@@ -787,9 +797,9 @@ function renderStats(box, list) {
     s.appendChild(el("div", "stat-label", label));
     return s;
   };
-  box.appendChild(cell(String(week.length), "杯", "この7日"));
-  box.appendChild(cell(avg ? avg.toFixed(1) : "—", avg ? "★" : "", "平均の評価"));
-  box.appendChild(cell(topMethod ? topMethod[0] : "—", "", "よく使う器具"));
+  box.appendChild(cell(String(week.length), "cups", "last 7 days"));
+  box.appendChild(cell(avg ? avg.toFixed(1) : "—", avg ? "★" : "", "average rating"));
+  box.appendChild(cell(topMethod ? topMethod[0] : "—", "", "most used"));
 }
 
 /* ---------- タイマーの見た目 ---------- */
@@ -808,14 +818,14 @@ function renderTimerStatic() {
   }
 
   const toggle = $("timer-toggle");
-  toggle.textContent = timer.state === "running" ? "一時停止"
-    : timer.state === "paused" ? "つづける"
-    : timer.state === "done" ? "もう一度" : "開始";
+  toggle.textContent = timer.state === "running" ? "Pause"
+    : timer.state === "paused" ? "Resume"
+    : timer.state === "done" ? "Again" : "Start";
   toggle.classList.toggle("running", timer.state === "running");
   $("timer-lap").hidden = !free || timer.state === "idle";
   $("timer-to-log").hidden = !(timer.state === "done" || (free && timer.state !== "idle"));
   $("water-bar").hidden = free || !scaledWater();
-  $("timer-total").textContent = free ? "レシピなし" : `/ ${fmtClock(timerTotalSec())}`;
+  $("timer-total").textContent = free ? "no recipe" : `/ ${fmtClock(timerTotalSec())}`;
   if (!free) $("water-goal").textContent = String(scaledWater());
 
   renderTimerTrack();
@@ -829,7 +839,7 @@ function renderTimerTrack() {
     timer.laps.forEach((lap, i) => {
       const row = el("div", "track-step done");
       row.appendChild(el("span", "ts-time mono", fmtClock(lap / 1000)));
-      row.appendChild(el("span", "ts-label", `${i + 1}回目`));
+      row.appendChild(el("span", "ts-label", `Pour ${i + 1}`));
       box.appendChild(row);
     });
     return;
@@ -841,7 +851,7 @@ function renderTimerTrack() {
     row.dataset.idx = String(i);
     row.appendChild(el("span", "ts-time mono", fmtClock(s.at)));
     const label = s.kind === "pour" && total > 1
-      ? `${s.label || `${pourIndex(steps, i)}投目`}（${pourIndex(steps, i)}/${total}）`
+      ? `${s.label || `Pour ${pourIndex(steps, i)}`} (${pourIndex(steps, i)}/${total})`
       : (s.label || KIND_LABEL[s.kind] || "");
     row.appendChild(el("span", "ts-label", label));
     if (s.water) row.appendChild(el("span", "ts-water", `${s.water}g`));
@@ -858,8 +868,8 @@ function renderTimerLive() {
     /* レシピなしのときは、1分で一周する秒針のように回す */
     const p = (elapsedSec % 60) / 60;
     dial.style.strokeDashoffset = String(DIAL_CIRCUMFERENCE * (1 - p));
-    $("timer-now-kind").textContent = timer.state === "running" ? "計測中" : "レシピなし";
-    $("timer-now-label").textContent = timer.laps.length ? `${timer.laps.length}回 注いだ` : "自由に計る";
+    $("timer-now-kind").textContent = timer.state === "running" ? "Timing" : "No recipe";
+    $("timer-now-label").textContent = timer.laps.length ? `${timer.laps.length} pours so far` : "Free timer";
     $("timer-now-water").textContent = "";
     $("timer-next").textContent = "";
     return;
@@ -880,18 +890,18 @@ function renderTimerLive() {
   const labelEl = $("timer-now-label");
   const waterEl = $("timer-now-water");
   if (timer.state === "idle") {
-    kindEl.textContent = "準備";
-    labelEl.textContent = "開始を押してください";
-    waterEl.textContent = `${scaledDose()}g の粉に ${scaledWater()}g`;
+    kindEl.textContent = "Ready";
+    labelEl.textContent = "Press start when you are";
+    waterEl.textContent = `${scaledDose()} g of coffee, ${scaledWater()} g of water`;
   } else if (cur) {
     const pt = pourTotal(steps);
     kindEl.textContent = cur.kind === "pour" && pt > 1
       ? `${KIND_LABEL.pour} ${pourIndex(steps, curIdx)}/${pt}`
-      : (KIND_LABEL[cur.kind] || "手順");
+      : (KIND_LABEL[cur.kind] || "Step");
     labelEl.textContent = cur.label || KIND_LABEL[cur.kind] || "";
-    waterEl.textContent = cur.water ? `合計 ${cur.water}g まで` : (cur.note || "");
+    waterEl.textContent = cur.water ? `Up to ${cur.water} g total` : (cur.note || "");
   } else {
-    kindEl.textContent = "まもなく";
+    kindEl.textContent = "Coming up";
     labelEl.textContent = next ? (next.label || "") : "";
     waterEl.textContent = "";
   }
@@ -899,10 +909,10 @@ function renderTimerLive() {
   const nextEl = $("timer-next");
   if (next && timer.state !== "done") {
     const left = Math.max(0, Math.ceil(next.at - elapsedSec));
-    const name = next.label || KIND_LABEL[next.kind] || "次";
-    nextEl.innerHTML = `次は「${escapeHtml(name)}」まで <span class="cd">${left}</span> 秒`;
+    const name = next.label || KIND_LABEL[next.kind] || "next";
+    nextEl.innerHTML = `${escapeHtml(name)} in <span class="cd">${left}</span> s`;
   } else if (timer.state === "done") {
-    nextEl.textContent = "できあがりです";
+    nextEl.textContent = "Your coffee is ready";
   } else {
     nextEl.textContent = "";
   }
@@ -955,7 +965,7 @@ $("timer-mute").addEventListener("click", async () => {
   await saveSettings();
   syncMuteIcon();
   if (timer.state === "running") scheduleUpcomingSounds(); else cancelScheduledSounds();
-  toast(settings.chime ? "音を鳴らします" : "音を止めました");
+  toast(settings.chime ? "Sound on" : "Sound off");
 });
 function syncMuteIcon() {
   const svg = $("timer-mute").querySelector("svg");
@@ -1015,12 +1025,12 @@ function brewItem(brew) {
   const item = el("button", "brew-item");
   item.type = "button";
   const body = el("div", "bi-body");
-  body.appendChild(el("div", "bi-title", brew.bean || brew.recipeName || brew.method || "名前のない一杯"));
+  body.appendChild(el("div", "bi-title", brew.bean || brew.recipeName || brew.method || "Untitled cup"));
   const bits = [];
   if (brew.method) bits.push(brew.method);
   if (brew.doseG && brew.waterG) bits.push(`${brew.doseG}g/${brew.waterG}g`);
   if (brew.doseG && brew.waterG) bits.push(ratioText(brew.doseG, brew.waterG));
-  if (brew.tempC) bits.push(`${brew.tempC}℃`);
+  if (brew.tempC) bits.push(`${brew.tempC}°C`);
   if (brew.timeSec) bits.push(fmtClock(brew.timeSec));
   body.appendChild(el("div", "bi-sub", bits.join(" · ") || "—"));
   item.appendChild(body);
@@ -1058,8 +1068,8 @@ function renderLog() {
   $("log-empty").hidden = list.length > 0;
   if (!list.length) {
     $("log-empty").textContent = all.length
-      ? "この条件に合う記録はありません。"
-      : "まだ記録がありません。淹れたらここに残していきましょう。";
+      ? "Nothing matches that."
+      : "Nothing logged yet. Brew something and it will live here.";
     return;
   }
   let lastKey = "";
@@ -1067,7 +1077,7 @@ function renderLog() {
     const d = new Date(b.brewedAt);
     const key = `${d.getFullYear()}-${d.getMonth()}`;
     if (key !== lastKey) {
-      box.appendChild(el("div", "month-head", `${d.getFullYear()}年 ${d.getMonth() + 1}月`));
+      box.appendChild(el("div", "month-head", `${MONTHS_FULL[d.getMonth()]} ${d.getFullYear()}`));
       lastKey = key;
     }
     box.appendChild(brewItem(b));
@@ -1096,8 +1106,8 @@ $("home-manual-log-btn").addEventListener("click", () => $("log-add-btn").click(
 
 /* ---------- 記録の詳細 ---------- */
 const TASTE_AXES = [
-  ["acidity", "酸味"], ["sweetness", "甘み"], ["bitterness", "苦味"],
-  ["body", "コク"], ["aroma", "香り"],
+  ["acidity", "Acidity"], ["sweetness", "Sweetness"], ["bitterness", "Bitterness"],
+  ["body", "Body"], ["aroma", "Aroma"],
 ];
 
 /* 5つの軸をレーダーで描く。数字の羅列より、輪郭のほうが一杯ごとの
@@ -1110,7 +1120,7 @@ function tasteRadar(taste) {
     const r = (R * Math.max(0, Math.min(5, v))) / 5;
     return [cx + r * Math.cos(a), cy + r * Math.sin(a)];
   };
-  let svg = `<svg class="radar" viewBox="0 0 ${size} ${size}" role="img" aria-label="味のバランス">`;
+  let svg = `<svg class="radar" viewBox="0 0 ${size} ${size}" role="img" aria-label="Taste balance">`;
   for (let ring = 1; ring <= 5; ring++) {
     const pts = TASTE_AXES.map((_, i) => point(i, ring).map((v) => v.toFixed(1)).join(",")).join(" ");
     svg += `<polygon class="grid" points="${pts}"/>`;
@@ -1134,7 +1144,7 @@ function openBrewDetail(id) {
   const b = findBrew(id);
   if (!b) return;
   detailId = id;
-  $("detail-title").textContent = fmtDate(b.brewedAt) + " の一杯";
+  $("detail-title").textContent = fmtDate(b.brewedAt);
 
   const kv = (label, value, unit) =>
     `<div class="kv"><div class="kv-label">${label}</div><div class="kv-value">${value ?? "—"}${
@@ -1145,31 +1155,31 @@ function openBrewDetail(id) {
     ? `<div class="note-block"><div class="note-head">${head}</div><div class="note-body">${escapeHtml(body)}</div></div>`
     : "";
 
-  const sub = [b.roaster, b.roast, b.recipeName ? `レシピ: ${b.recipeName}` : "", fmtDateTime(b.brewedAt)]
+  const sub = [b.roaster, b.roast, b.recipeName ? `Recipe: ${b.recipeName}` : "", fmtDateTime(b.brewedAt)]
     .filter(Boolean).join(" · ");
 
   $("detail-body").innerHTML = `
     <div class="detail-hero">
-      <div class="dh-bean">${escapeHtml(b.bean || b.method || "名前のない一杯")}</div>
+      <div class="dh-bean">${escapeHtml(b.bean || b.method || "Untitled cup")}</div>
       <div class="dh-sub">${escapeHtml(sub)}</div>
       <div class="dh-stars">${b.rating ? starsHtml(b.rating) : '<span class="off">★★★★★</span>'}</div>
     </div>
     <div class="kv-grid">
-      ${kv("粉", b.doseG, "g")}
-      ${kv("湯", b.waterG, "g")}
-      ${kv("比率", b.doseG && b.waterG ? ratioText(b.doseG, b.waterG) : null, "")}
-      ${kv("湯温", b.tempC, "℃")}
-      ${kv("時間", b.timeSec ? fmtClock(b.timeSec) : null, "")}
-      ${kv("挽き目", b.grind || null, "")}
+      ${kv("Dose", b.doseG, "g")}
+      ${kv("Water", b.waterG, "g")}
+      ${kv("Ratio", b.doseG && b.waterG ? ratioText(b.doseG, b.waterG) : null, "")}
+      ${kv("Temp", b.tempC, "°C")}
+      ${kv("Time", b.timeSec ? fmtClock(b.timeSec) : null, "")}
+      ${kv("Grind", b.grind || null, "")}
     </div>
-    ${b.method || b.grinder ? `<div class="note-block"><div class="note-head">道具</div><div class="note-body">${
+    ${b.method || b.grinder ? `<div class="note-block"><div class="note-head">Gear</div><div class="note-body">${
       escapeHtml([b.method, b.grinder].filter(Boolean).join(" / "))}</div></div>` : ""}
     <div class="radar-box">${tasteRadar(b.taste)}</div>
     ${tags ? `<div class="tag-row">${tags}</div>` : ""}
-    ${note("感想", b.notes)}
-    ${note("次はこうする", b.next)}
-    <button class="wide-btn primary" id="detail-rebrew" type="button">同じレシピで淹れる</button>
-    <button class="wide-btn ghost" id="detail-copy" type="button">これをもとに新しく記録する</button>
+    ${note("How it went", b.notes)}
+    ${note("Next time", b.next)}
+    <button class="wide-btn primary" id="detail-rebrew" type="button">Brew this recipe again</button>
+    <button class="wide-btn ghost" id="detail-copy" type="button">Start a new log from this</button>
   `;
 
   const rebrew = $("detail-rebrew");
@@ -1177,7 +1187,7 @@ function openBrewDetail(id) {
   if (recipe) {
     rebrew.addEventListener("click", () => openTimer(recipe));
   } else {
-    rebrew.textContent = "レシピなしで計る";
+    rebrew.textContent = "Time it without a recipe";
     rebrew.addEventListener("click", () => openTimer(null));
   }
   $("detail-copy").addEventListener("click", () => {
@@ -1196,8 +1206,8 @@ $("detail-edit").addEventListener("click", () => {
 
 /* ---------- 記録の編集 ---------- */
 const FLAVOR_PRESETS = [
-  "フローラル", "ベリー", "柑橘", "りんご", "ぶどう", "はちみつ",
-  "チョコ", "ナッツ", "キャラメル", "スパイス", "紅茶", "青草", "焦げ",
+  "Floral", "Berry", "Citrus", "Apple", "Grape", "Honey",
+  "Chocolate", "Nutty", "Caramel", "Spice", "Tea-like", "Grassy", "Ashy",
 ];
 let editingBrew = null;
 let editingIsNew = false;
@@ -1223,7 +1233,7 @@ function openBrewEditor(brew, { isNew }) {
   editingBrew = brew;
   editingIsNew = isNew;
   refreshSuggestLists();
-  $("brew-edit-title").textContent = isNew ? "記録する" : "記録を直す";
+  $("brew-edit-title").textContent = isNew ? "Log a brew" : "Edit this brew";
   $("brew-delete").hidden = isNew;
 
   $("f-brewed-at").value = toLocalInput(brew.brewedAt);
@@ -1258,7 +1268,7 @@ function renderStarPicker() {
   for (let i = 1; i <= 5; i++) {
     const b = el("button", `star${i <= (editingBrew.rating || 0) ? " on" : ""}`, "★");
     b.type = "button";
-    b.setAttribute("aria-label", `${i}点`);
+    b.setAttribute("aria-label", `${i} out of 5`);
     b.addEventListener("click", () => {
       /* 同じ星をもう一度押したら取り消し。付け間違いを直せるように */
       editingBrew.rating = editingBrew.rating === i ? 0 : i;
@@ -1337,16 +1347,16 @@ $("brew-save").addEventListener("click", async () => {
   b.notes = $("f-notes").value.trim();
   b.next = $("f-next").value.trim();
   await saveBrew(b);
-  toast(editingIsNew ? "記録しました" : "直しました");
+  toast(editingIsNew ? "Logged" : "Saved");
   renderHome();
   renderLog();
   openBrewDetail(b.id);
 });
 
 $("brew-delete").addEventListener("click", async () => {
-  if (!(await confirmAsk("この記録を削除します。よろしいですか。"))) return;
+  if (!(await confirmAsk("Delete this brew? This cannot be undone."))) return;
   await removeRecord("brews", editingBrew.id);
-  toast("削除しました");
+  toast("Deleted");
   renderHome();
   renderLog();
   showScreen("log");
@@ -1358,7 +1368,7 @@ function renderRecipes() {
   box.innerHTML = "";
   const list = liveRecipes();
   if (!list.length) {
-    box.appendChild(el("p", "empty-note", "レシピがありません。右上の＋から作れます。"));
+    box.appendChild(el("p", "empty-note", "No recipes. Add one with the + above."));
     return;
   }
   for (const r of list) box.appendChild(recipeCard(r, true));
@@ -1373,7 +1383,7 @@ function openRecipeEditor(id) {
   const found = id ? findRecipe(id) : null;
   editingRecipe = found ? JSON.parse(JSON.stringify(found)) : emptyRecipe();
   editingRecipeIsNew = !found;
-  $("recipe-edit-title").textContent = found ? "レシピを直す" : "レシピを作る";
+  $("recipe-edit-title").textContent = found ? "Edit recipe" : "New recipe";
   $("recipe-delete").hidden = !found;
   $("r-name").value = editingRecipe.name || "";
   $("r-method").value = editingRecipe.method || "";
@@ -1395,7 +1405,7 @@ function renderStepEditor() {
 
     const grid = el("div", "step-grid");
     const timeField = el("div", "field mini w-time");
-    timeField.innerHTML = '<label>時刻</label>';
+    timeField.innerHTML = '<label>At</label>';
     const timeInput = document.createElement("input");
     timeInput.type = "text";
     timeInput.inputMode = "numeric";
@@ -1409,7 +1419,7 @@ function renderStepEditor() {
     grid.appendChild(timeField);
 
     const kindField = el("div", "field mini w-kind");
-    kindField.innerHTML = '<label>種類</label>';
+    kindField.innerHTML = '<label>Kind</label>';
     const kindSelect = document.createElement("select");
     for (const [value, label] of Object.entries(KIND_LABEL)) {
       const opt = document.createElement("option");
@@ -1426,7 +1436,7 @@ function renderStepEditor() {
     grid.appendChild(kindField);
 
     const waterField = el("div", "field mini w-water");
-    waterField.innerHTML = '<label>合計g</label>';
+    waterField.innerHTML = '<label>Total g</label>';
     const waterInput = document.createElement("input");
     waterInput.type = "number";
     waterInput.inputMode = "decimal";
@@ -1439,7 +1449,7 @@ function renderStepEditor() {
 
     const del = el("button", "step-del");
     del.type = "button";
-    del.setAttribute("aria-label", "この手順を消す");
+    del.setAttribute("aria-label", "Remove this step");
     del.innerHTML = '<svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M6 6l12 12M18 6L6 18"/></svg>';
     del.addEventListener("click", () => {
       editingRecipe.steps.splice(i, 1);
@@ -1452,7 +1462,7 @@ function renderStepEditor() {
     labelField.style.marginBottom = "0";
     const labelInput = document.createElement("input");
     labelInput.type = "text";
-    labelInput.placeholder = step.kind === "pour" ? "例）2投目" : "例）泡を沈める";
+    labelInput.placeholder = step.kind === "pour" ? "e.g. Second pour" : "e.g. Break the crust";
     labelInput.value = step.label || "";
     labelInput.addEventListener("input", () => { step.label = labelInput.value; });
     labelField.appendChild(labelInput);
@@ -1476,7 +1486,7 @@ $("r-add-step").addEventListener("click", () => {
 
 $("recipe-save").addEventListener("click", async () => {
   const r = editingRecipe;
-  r.name = $("r-name").value.trim() || "名前のないレシピ";
+  r.name = $("r-name").value.trim() || "Untitled recipe";
   r.method = $("r-method").value.trim();
   r.grind = $("r-grind").value;
   r.doseG = num($("r-dose").value, 15);
@@ -1490,16 +1500,16 @@ $("recipe-save").addEventListener("click", async () => {
   /* 合計時間が手順より短いと、最後の手順が鳴る前に終わってしまう */
   r.totalSec = Math.max(parseClock($("r-total").value) ?? 0, lastAt);
   await saveRecipe(r);
-  toast(editingRecipeIsNew ? "レシピを作りました" : "保存しました");
+  toast(editingRecipeIsNew ? "Recipe created" : "Saved");
   renderRecipes();
   renderHome();
   showScreen("recipes");
 });
 
 $("recipe-delete").addEventListener("click", async () => {
-  if (!(await confirmAsk("このレシピを削除します。よろしいですか。"))) return;
+  if (!(await confirmAsk("Delete this recipe? This cannot be undone."))) return;
   await removeRecord("recipes", editingRecipe.id);
-  toast("削除しました");
+  toast("Deleted");
   renderRecipes();
   renderHome();
   showScreen("recipes");
@@ -1529,7 +1539,7 @@ function renderSettings() {
   renderRoastPicker();
   $("app-version").textContent = `v${APP_VERSION}`;
   $("s-data-note").textContent =
-    `この端末に レシピ ${liveRecipes().length}件 / 記録 ${liveBrews().length}件`;
+    `On this device: ${plural(liveRecipes().length, "recipe")}, ${plural(liveBrews().length, "brew")}`;
 }
 
 bindSwitch("s-chime", "chime", () => { syncMuteIcon(); if (timer.state === "running") scheduleUpcomingSounds(); });
@@ -1544,7 +1554,7 @@ $("s-volume").addEventListener("input", (e) => {
   $("s-volume-out").textContent = `${settings.volume}%`;
 });
 $("s-volume").addEventListener("change", saveSettings);
-$("s-test-chime").addEventListener("click", () => { playSoundNow("step"); speak("2投目。160グラムまで"); });
+$("s-test-chime").addEventListener("click", () => { playSoundNow("step"); speak("Second pour. Up to 160 grams"); });
 /* 見本の丸は、いま見えている面での色をそのまま塗る。選んだ結果が
    そのとおりに出るほうが、選びやすい */
 function renderRoastPicker() {
@@ -1565,12 +1575,12 @@ function renderRoastPicker() {
       applyTheme();
       await saveSettings();
       renderRoastPicker();
-      toast(`${roast.name}の色にしました`);
+      toast(`${roast.name} roast it is`);
     });
     box.appendChild(btn);
   }
   const note = $("s-roast-note");
-  if (note) note.textContent = `いまは${findRoast(settings.roast).name}。豆の色が深くなるほど、差し色も深くなります。`;
+  if (note) note.textContent = `${findRoast(settings.roast).name} right now. The darker the bean, the deeper the accent.`;
 }
 
 $("s-theme").addEventListener("change", async (e) => {
@@ -1609,9 +1619,9 @@ function toCsv(headers, rows) {
 /* 時間は「3:00」と「180」の両方を出す。読むためと、並べ替え・計算のため */
 function brewsCsv() {
   const headers = [
-    "日時", "豆", "焙煎所", "焙煎度", "器具", "挽き目", "ミル・目盛り",
-    "粉(g)", "湯(g)", "比率", "湯温(℃)", "抽出時間", "抽出秒数", "レシピ",
-    "総合評価", "酸味", "甘み", "苦味", "コク", "香り", "風味", "感想", "次はこうする",
+    "Brewed at", "Coffee", "Roaster", "Roast", "Brewer", "Grind", "Grinder setting",
+    "Dose (g)", "Water (g)", "Ratio", "Temp (C)", "Brew time", "Brew seconds", "Recipe",
+    "Rating", "Acidity", "Sweetness", "Bitterness", "Body", "Aroma", "Flavours", "How it went", "Next time",
   ];
   const rows = liveBrews().slice().reverse().map((b) => [
     fmtDateTime(b.brewedAt),
@@ -1632,8 +1642,8 @@ function brewsCsv() {
 /* 手順は行を分けず、1つの欄にまとめる。1レシピ=1行のほうが表として扱いやすい */
 function recipesCsv() {
   const headers = [
-    "レシピ名", "器具", "挽き目", "粉(g)", "湯(g)", "比率", "湯温(℃)",
-    "合計時間", "手順数", "手順", "メモ",
+    "Recipe", "Brewer", "Grind", "Dose (g)", "Water (g)", "Ratio", "Temp (C)",
+    "Total time", "Steps", "Sequence", "Notes",
   ];
   const rows = liveRecipes().map((r) => {
     const steps = (r.steps || []).slice().sort((a, b) => a.at - b.at);
@@ -1651,26 +1661,26 @@ function recipesCsv() {
 
 $("s-export-csv").addEventListener("click", () => {
   const n = liveBrews().length;
-  if (!n) { toast("書き出せる記録がまだありません"); return; }
+  if (!n) { toast("Nothing to export yet"); return; }
   downloadFile(`coffeerence-records-${today()}.csv`, brewsCsv(), "text/csv;charset=utf-8");
-  toast(`記録${n}件をCSVにしました`);
+  toast(`${plural(n, "brew")} exported`);
 });
 
 $("s-export-recipes-csv").addEventListener("click", () => {
   const n = liveRecipes().length;
-  if (!n) { toast("書き出せるレシピがありません"); return; }
+  if (!n) { toast("No recipes to export"); return; }
   downloadFile(`coffeerence-recipes-${today()}.csv`, recipesCsv(), "text/csv;charset=utf-8");
-  toast(`レシピ${n}件をCSVにしました`);
+  toast(`${plural(n, "recipe")} exported`);
 });
 
 $("s-restore-recipes").addEventListener("click", async () => {
   const existing = new Set(liveRecipes().map((r) => r.name));
   const add = starterRecipes().filter((r) => !existing.has(r.name));
-  if (!add.length) { toast("すでに全部そろっています"); return; }
+  if (!add.length) { toast("They are all here already"); return; }
   recipes.push(...add);
   await idbPutMany("recipes", add);
   renderRecipes(); renderHome(); renderSettings();
-  toast(`${add.length}件を入れ直しました`);
+  toast(`${plural(add.length, "recipe")} put back`);
 });
 
 /* ------------------------------------------------------------------ *
@@ -1740,5 +1750,5 @@ boot().catch((err) => {
   console.error("起動に失敗しました:", err);
   document.body.innerHTML =
     '<p style="padding:40px;text-align:center;line-height:2;">'
-    + "アプリを開けませんでした。<br>ページを再読み込みしてみてください。</p>";
+    + "Could not open the app.<br>Try reloading the page.</p>";
 });
