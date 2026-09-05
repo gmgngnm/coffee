@@ -19,11 +19,11 @@
  *   8. 起動
  * ==================================================================== */
 
-const APP_VERSION = "2.0.0";
+const APP_VERSION = "2.1.0";
 
 /* ホームのロゴの下に #002 の形で出す、mainへマージした回数。
    マージのたびに1つ増やす（この見た目になるまでに何回積んだか） */
-const MERGE_COUNT = 11;
+const MERGE_COUNT = 12;
 
 /* ------------------------------------------------------------------ *
  * 1. 下ごしらえ
@@ -558,7 +558,8 @@ function openTimer(recipe) {
   timer.firedIdx = -1;
   timer.laps = [];
   timer.startedAt = 0;
-  brew.level = 0; brew.target = 0; brew.pourAt = -1e9; brew.at = 0;
+  brew.level = 0; brew.target = 0; brew.at = 0;
+  brew.pours = []; brew.ripples = []; brew.puffs = [];
   $("timer-title").textContent = recipe ? recipe.name : "Free timer";
   renderTimerStatic();
   renderTimerLive();
@@ -858,20 +859,49 @@ function drawSectorDial(sectors) {
   }
 }
 
-/* ---------- 背景（迫り上がる液面と湯気） ---------- */
+/* ---------- 背景（迫り上がる液面・注ぎ・湯気） ---------- *
+ *  絵として嘘をつかない範囲で、実際の見え方に寄せている。
+ *   ・落ちる湯は、速くなるぶん細くなる（連続の式と自由落下）
+ *   ・落ちた点から波紋が外へ伝わる（一様に揺らすのではなく）
+ *   ・湯気は線ではなく、昇りながら膨らんで薄れる粒の集まり
+ * ------------------------------------------------------------------ */
 const brew = {
   level: 0,        // いま描いている高さ（0〜1）
   target: 0,       // 注いだぶんの高さ
-  pourAt: -1e9,    // 最後に注ぎ始めた時刻
-  pourX: 0.5,      // 注ぎ口の位置（画面幅に対する割合）
   at: 0,
+  pours: [],       // 落ちている湯 {t0, x}
+  ripples: [],     // 水面を伝わる波 {t0, x}
+  puffs: [],       // 湯気の粒
+  puffAt: 0,
 };
-const POUR_MS = 1400;          // 注ぎの筋を見せる長さ
-const LEVEL_MAX = 0.34;        // 画面のどこまで上げるか（経過の文字より下に留める）
+const POUR_MS = 2200;          // 湯を落として見せる長さ
+const LEVEL_MAX = 0.92;        // 最後は画面の上のほうまで満ちる
+const V0 = 300, GRAV = 1700;   // 注ぎ口での速さと重力（px/s, px/s²）
 
 function splashPour() {
-  brew.pourAt = performance.now();
-  brew.pourX = 0.42 + Math.random() * 0.16;
+  brew.pours.push({
+    t0: performance.now(),
+    x: 0.40 + Math.random() * 0.2,          // 液面が低いとき（円の下）
+    side: Math.random() < 0.5 ? 0.1 : 0.9,  // 高いとき（円の脇）
+  });
+  if (brew.pours.length > 3) brew.pours.shift();
+}
+
+/* 水面の高さ。うねりに、落ちた点から広がる波を重ねる */
+function surfaceAt(x, base, t, now) {
+  let y = base
+    + Math.sin(x / 88 + t * 0.8) * 2.6
+    + Math.sin(x / 43 - t * 1.35) * 1.5
+    + Math.sin(x / 210 + t * 0.35) * 3.2;
+  for (const r of brew.ripples) {
+    const age = (now - r.t0) / 1000;
+    if (age < 0 || age > 2.6) continue;
+    const d = Math.abs(x - r.x);
+    const front = age * 190;                     // 波の進む速さ
+    const env = Math.exp(-age / 1.1) * Math.exp(-Math.abs(d - front) / 80);
+    y += Math.sin((d - front) / 24) * 10 * env;
+  }
+  return y;
 }
 
 function drawBrewBackground(now) {
@@ -889,91 +919,178 @@ function drawBrewBackground(now) {
 
   const dt = Math.min(120, now - (brew.at || now - 16));
   brew.at = now;
-  /* 注いだぶんは、跳ねずにゆっくり満ちる */
-  brew.level += (brew.target - brew.level) * (1 - Math.exp(-dt / 260));
-  if (brew.level < 0.001 && brew.target <= 0) return;
+  const t = now / 1000;
+  /* 注いだぶんは、落ちてくる湯に合わせてゆっくり満ちる */
+  brew.level += (brew.target - brew.level) * (1 - Math.exp(-dt / 620));
+  brew.ripples = brew.ripples.filter((r) => now - r.t0 < 2600);
+  brew.pours = brew.pours.filter((p) => now - p.t0 < POUR_MS + 400);
+  if (brew.level < 0.002 && brew.target <= 0 && !brew.puffs.length) return;
 
   const { accent } = themeColors();
-  const since = now - brew.pourAt;
-  const pouring = since >= 0 && since < POUR_MS;
-  /* 注いだ直後はしばらく波が立つ */
-  const stir = pouring ? Math.exp(-since / 520) : 0;
+  const base = h - brew.level * LEVEL_MAX * h;
+  const yAt = (x) => surfaceAt(x, base, t, now);
 
-  const surface = h - brew.level * LEVEL_MAX * h;
-  const t = now / 1000;
-  const waveAt = (x) =>
-    surface
-    + Math.sin(x / 86 + t * 0.9) * (3 + stir * 9)
-    + Math.sin(x / 41 - t * 1.5) * (1.8 + stir * 5);
-
-  /* 液は下ほど濃く。文字に重なる上のほうは、ほとんど色が乗らない */
-  const grad = ctx.createLinearGradient(0, surface, 0, h);
-  grad.addColorStop(0, cssRgba(accent, 0.06));
+  /* --- 液 --- */
+  /* 濃さは水面からの深さで決める。上に来ても、文字の背後がべたに
+     ならないよう頭打ちにする */
+  const grad = ctx.createLinearGradient(0, base - 6, 0, Math.min(h, base + 320));
+  grad.addColorStop(0, cssRgba(accent, 0.03));
+  grad.addColorStop(0.35, cssRgba(accent, 0.13));
   grad.addColorStop(1, cssRgba(accent, 0.2));
   ctx.fillStyle = grad;
   ctx.beginPath();
-  ctx.moveTo(0, waveAt(0));
-  for (let x = 0; x <= w; x += 6) ctx.lineTo(x, waveAt(x));
+  ctx.moveTo(0, yAt(0));
+  for (let x = 0; x <= w; x += 4) ctx.lineTo(x, yAt(x));
   ctx.lineTo(w, h);
   ctx.lineTo(0, h);
   ctx.closePath();
   ctx.fill();
 
-  /* 水面の線を1本だけ引くと、液体らしさが出る */
-  ctx.strokeStyle = cssRgba(accent, 0.16);
-  ctx.lineWidth = 1.5;
+  /* 水面の線と、そのすぐ下の照り返し */
+  ctx.strokeStyle = cssRgba(accent, 0.22);
+  ctx.lineWidth = 1.4;
   ctx.beginPath();
-  ctx.moveTo(0, waveAt(0));
-  for (let x = 0; x <= w; x += 6) ctx.lineTo(x, waveAt(x));
+  ctx.moveTo(0, yAt(0));
+  for (let x = 0; x <= w; x += 4) ctx.lineTo(x, yAt(x));
+  ctx.stroke();
+  ctx.strokeStyle = cssRgba(accent, 0.07);
+  ctx.lineWidth = 5;
+  ctx.beginPath();
+  ctx.moveTo(0, yAt(0) + 6);
+  for (let x = 0; x <= w; x += 6) ctx.lineTo(x, yAt(x) + 6);
   ctx.stroke();
 
-  /* 注ぎの筋。水面の少し上から落ちる。文字や円を貫かないよう、
-     高くても画面の7割より下から始める */
-  const px = brew.pourX * w;
-  const level = waveAt(px);
-  const top = Math.max(level - 150, h * 0.7);
-  if (pouring && level - top > 26) {
-    const fall = Math.min(1, since / 240);
-    const tip = top + (level - top) * fall;
-    const fade = since > POUR_MS - 400 ? (POUR_MS - since) / 400 : 1;
-    ctx.lineCap = "round";
-    ctx.strokeStyle = cssRgba(accent, 0.22 * fade);
-    ctx.lineWidth = 3;
+  /* --- 落ちる湯 --- */
+  for (const p of brew.pours) {
+    const since = now - p.t0;
+    /* 落とす位置は最初の1コマで決める。液面が円の下端まで来ていたら、
+       円や文字を突き抜けないよう脇へ寄せる。途中で変えると横に飛ぶ */
+    if (p.px === undefined) {
+      /* 判定は、いまの高さではなく、この注ぎで上がりきる高さで行う。
+         注ぎのあいだに液面が上がるので、いまを見ると必ず中央になる */
+      const willBe = h - brew.target * LEVEL_MAX * h;
+      p.px = (willBe > h * 0.6 ? p.x : p.side) * w;
+    }
+    const px = p.px;
+    const surface = yAt(px);
+    /* 円や文字を貫かないよう、長すぎない位置から落とす */
+    const len = Math.min(200, Math.max(46, surface - h * 0.56));
+    const top = surface - len;
+    const fade = since < 180 ? since / 180
+      : since > POUR_MS - 500 ? Math.max(0, (POUR_MS - since) / 500) : 1;
+    if (fade <= 0) continue;
+
+    /* 落ちるほど速くなり、そのぶん細くなる（連続の式）。
+       横のゆらぎは、上から下へ流れていくように位相をずらす */
+    const w0 = 11;
+    const xAt = (dy) => px + Math.sin(dy / 34 - since / 90) * (0.7 + dy / len * 1.6);
+    const widthAt = (dy) => w0 * Math.sqrt(V0 / Math.sqrt(V0 * V0 + 2 * GRAV * dy));
+    const reach = Math.min(len, (V0 * (since / 1000) + 0.5 * GRAV * (since / 1000) ** 2) * 1.2);
+
     ctx.beginPath();
-    ctx.moveTo(px + Math.sin(t * 7) * 1.2, top);
-    ctx.quadraticCurveTo(px + Math.sin(t * 5) * 3, (top + tip) / 2, px, tip);
+    for (let dy = 0; dy <= reach; dy += 6) ctx.lineTo(xAt(dy) - widthAt(dy) / 2, top + dy);
+    for (let dy = reach; dy >= 0; dy -= 6) ctx.lineTo(xAt(dy) + widthAt(dy) / 2, top + dy);
+    ctx.closePath();
+    ctx.fillStyle = cssRgba(accent, 0.4 * fade);
+    ctx.fill();
+    /* 水らしさは、筋の片側に淡い照りを1本入れると出る。強く引くと
+       針金のように見えるので、太めに薄く */
+    ctx.strokeStyle = cssRgba(accent, 0.24 * fade);
+    ctx.lineWidth = 2.6;
+    ctx.beginPath();
+    for (let dy = 2; dy <= reach; dy += 6) ctx.lineTo(xAt(dy) - widthAt(dy) * 0.22, top + dy);
     ctx.stroke();
-    /* 落ちた先の波紋。細く、静かに広がる */
-    if (fall >= 1) {
-      for (const d of [0, 320]) {
-        const age = since - 240 - d;
-        if (age < 0 || age > 900) continue;
-        const k = age / 900;
-        ctx.strokeStyle = cssRgba(accent, 0.16 * (1 - k) * fade);
-        ctx.lineWidth = 1.1;
+    ctx.strokeStyle = cssRgba(accent, 0.16 * fade);
+    ctx.lineWidth = 1.4;
+    ctx.beginPath();
+    for (let dy = 2; dy <= reach; dy += 6) ctx.lineTo(xAt(dy) + widthAt(dy) * 0.34, top + dy);
+    ctx.stroke();
+
+    /* 出だしを溶け込ませる。急に線が始まると、そこだけ作り物に見える */
+    ctx.save();
+    ctx.globalCompositeOperation = "destination-out";
+    const fadeTop = ctx.createLinearGradient(0, top - 2, 0, top + 26);
+    fadeTop.addColorStop(0, "rgba(0,0,0,1)");
+    fadeTop.addColorStop(1, "rgba(0,0,0,0)");
+    ctx.fillStyle = fadeTop;
+    ctx.fillRect(px - w0 * 1.5, top - 2, w0 * 3, 28);
+    ctx.restore();
+
+    /* 細くなった先はちぎれて粒になる */
+    if (reach >= len * 0.8) {
+      for (let i = 0; i < 3; i++) {
+        const dy = len * (0.82 + i * 0.06) + ((since / 6 + i * 23) % 26);
+        if (dy >= len) continue;
+        ctx.fillStyle = cssRgba(accent, 0.24 * fade);
         ctx.beginPath();
-        ctx.ellipse(px, level, k * w * 0.3, k * w * 0.05, 0, 0, TAU);
-        ctx.stroke();
+        ctx.ellipse(xAt(dy), top + dy, widthAt(dy) * 0.5, widthAt(dy) * 0.8, 0, 0, TAU);
+        ctx.fill();
+      }
+    }
+
+    /* 着水。波紋を撒き、当たった場所を少し明るくする */
+    if (reach >= len && !p.landed) {
+      p.landed = true;
+      brew.ripples.push({ t0: now, x: px });
+      setTimeout(() => brew.ripples.push({ t0: performance.now(), x: px }), 260);
+    }
+    if (p.landed) {
+      const age = (since - 200) / 1000;
+      /* 当たった場所は、泡が溜まって明るく見える */
+      ctx.fillStyle = cssRgba(accent, 0.12 * fade);
+      ctx.beginPath();
+      ctx.ellipse(px, surface + 2, 15 + age * 18, 4 + age * 3.4, 0, 0, TAU);
+      ctx.fill();
+      /* 跳ね上がりの冠。落ちてすぐの一瞬だけ */
+      const crown = Math.max(0, 1 - age * 3.2);
+      if (crown > 0) {
+        ctx.strokeStyle = cssRgba(accent, 0.34 * crown * fade);
+        ctx.lineWidth = 2;
+        for (const dir of [-1, 1]) {
+          ctx.beginPath();
+          ctx.moveTo(px + dir * 3, surface);
+          ctx.quadraticCurveTo(px + dir * (10 + 16 * (1 - crown)), surface - 16 * crown,
+                               px + dir * (17 + 22 * (1 - crown)), surface - 2);
+          ctx.stroke();
+        }
       }
     }
   }
 
-  /* 湯気。水面から3本、ゆらぎながら消えていく */
-  ctx.lineWidth = 9;
-  ctx.lineCap = "round";
-  for (let i = 0; i < 3; i++) {
-    const px = w * (0.34 + i * 0.16);
-    const phase = t * 0.5 + i * 2.1;
-    const life = (phase % 1);
-    const base = waveAt(px);
-    const top = base - 60 - life * 70;
-    ctx.strokeStyle = cssRgba(accent, 0.07 * (1 - life) * Math.min(1, brew.level * 4));
+  /* --- 湯気 --- */
+  /* 線を引くと作り物に見える。昇りながら膨らんで薄れる粒を撒く */
+  if (brew.level > 0.03 && now - brew.puffAt > 150) {
+    brew.puffAt = now;
+    const px = w * (0.3 + Math.random() * 0.4);
+    brew.puffs.push({
+      x: px, y: yAt(px) - 4, born: now,
+      life: 3400 + Math.random() * 1800,
+      r: 16 + Math.random() * 14,
+      vy: 30 + Math.random() * 20,
+      drift: (Math.random() - 0.5) * 26,
+      seed: Math.random() * 10,
+    });
+  }
+  brew.puffs = brew.puffs.filter((p) => now - p.born < p.life);
+  for (const p of brew.puffs) {
+    const age = (now - p.born) / p.life;
+    const y = p.y - p.vy * ((now - p.born) / 1000) * (1 + age * 1.4);
+    const x = p.x + Math.sin(age * 3.1 + p.seed) * 16 + p.drift * age;
+    const r = p.r * (1 + age * 2.4);
+    /* 出はじめと消えぎわを薄く。いちばん濃いところでも、ごく淡い */
+    const a = 0.11 * Math.sin(Math.min(1, age * 1.15) * Math.PI) * Math.min(1, brew.level * 5);
+    if (a <= 0.002) continue;
+    /* 液面が上がってくると、古い粒が水中に取り残される。水の中に湯気は
+       立たないので、沈んだものは描かない */
+    if (y > yAt(x) - 4) continue;
+    const g2 = ctx.createRadialGradient(x, y, 0, x, y, r);
+    g2.addColorStop(0, cssRgba(accent, a));
+    g2.addColorStop(0.55, cssRgba(accent, a * 0.45));
+    g2.addColorStop(1, cssRgba(accent, 0));
+    ctx.fillStyle = g2;
     ctx.beginPath();
-    for (let y = base; y > top; y -= 10) {
-      const k = (base - y) / (base - top);
-      ctx.lineTo(px + Math.sin(k * 3.4 + phase * 4) * 13 * k, y);
-    }
-    ctx.stroke();
+    ctx.arc(x, y, r, 0, TAU);
+    ctx.fill();
   }
 }
 
