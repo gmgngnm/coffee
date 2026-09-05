@@ -3,9 +3,12 @@
  *  知らせるタイマー。
  *
  *  作りは意図的に素朴に保っている。ビルド工程を持たず、index.html から
- *  この1ファイルを読むだけで動く。データはまず端末のIndexedDBに入り、
- *  Googleでサインインしたときだけ Supabase にも同じものを置く。
- *  サインインしなければ通信は一切発生しない。
+ *  この1ファイルを読むだけで動く。
+ *
+ *  記録はこの端末の IndexedDB にだけ置く。アカウントも、送信先の
+ *  サーバも持たない。淹れた記録がどこかへ流れていくことはない。
+ *  端末を移るとき・残しておきたいときは、設定から JSON か CSV で
+ *  書き出す（JSONはそのまま読み戻せる、CSVは表計算で開ける）。
  *
  *   1. 下ごしらえ（定数・小道具）
  *   2. IndexedDB
@@ -14,11 +17,10 @@
  *   5. 音（チャイム・読み上げ）
  *   6. タイマー
  *   7. 画面 — 淹れる／タイマー／記録／詳細／記録の編集／レシピ／設定
- *   8. Googleサインインと Supabase 同期
- *   9. 起動
+ *   8. 起動
  * ==================================================================== */
 
-const APP_VERSION = "1.0.0";
+const APP_VERSION = "1.1.0";
 
 /* ------------------------------------------------------------------ *
  * 1. 下ごしらえ
@@ -176,15 +178,6 @@ async function idbPutMany(store, values) {
     tx.onerror = () => reject(tx.error);
   });
 }
-async function idbDelete(store, key) {
-  const db = await openDb();
-  return new Promise((resolve, reject) => {
-    const tx = db.transaction(store, "readwrite");
-    tx.objectStore(store).delete(key);
-    tx.oncomplete = () => resolve();
-    tx.onerror = () => reject(tx.error);
-  });
-}
 async function kvGet(k, fallback = null) {
   const db = await openDb();
   return new Promise((resolve) => {
@@ -243,7 +236,7 @@ function emptyRecipe() {
     doseG: 15, waterG: 240, tempC: 92,
     steps: [{ at: 0, kind: "pour", water: 45, label: "蒸らし", note: "" }],
     totalSec: 180, memo: "",
-    createdAt: now, updatedAt: now, usedAt: 0, deleted: false, dirty: true,
+    createdAt: now, updatedAt: now, usedAt: 0, deleted: false,
   };
 }
 
@@ -257,26 +250,22 @@ function emptyBrew() {
     recipeId: "", recipeName: "",
     taste: { acidity: 3, sweetness: 3, bitterness: 3, body: 3, aroma: 3 },
     rating: 0, flavors: [], notes: "", next: "",
-    createdAt: now, updatedAt: now, deleted: false, dirty: true,
+    createdAt: now, updatedAt: now, deleted: false,
   };
 }
 
 async function saveRecipe(recipe) {
   recipe.updatedAt = Date.now();
-  recipe.dirty = true;
   const i = recipes.findIndex((r) => r.id === recipe.id);
   if (i >= 0) recipes[i] = recipe; else recipes.push(recipe);
   await idbPut("recipes", recipe);
-  pushDirty();
 }
 
 async function saveBrew(brew) {
   brew.updatedAt = Date.now();
-  brew.dirty = true;
   const i = brews.findIndex((b) => b.id === brew.id);
   if (i >= 0) brews[i] = brew; else brews.push(brew);
   await idbPut("brews", brew);
-  pushDirty();
 }
 
 /* 削除は「墓標」を残す。中身は捨ててよいが、idと時刻は同期のために要る */
@@ -286,9 +275,7 @@ async function removeRecord(store, id) {
   if (!rec) return;
   rec.deleted = true;
   rec.updatedAt = Date.now();
-  rec.dirty = true;
   await idbPut(store, rec);
-  pushDirty();
 }
 
 /* 最初に開いたときだけ入れる、よく知られたレシピ。
@@ -297,7 +284,7 @@ function starterRecipes() {
   const now = Date.now();
   const mk = (name, method, grind, doseG, waterG, tempC, totalSec, steps, memo) => ({
     id: newId(), name, method, grind, doseG, waterG, tempC, totalSec, steps, memo,
-    createdAt: now, updatedAt: now, usedAt: 0, deleted: false, dirty: true, starter: true,
+    createdAt: now, updatedAt: now, usedAt: 0, deleted: false, starter: true,
   });
   return [
     mk("4:6メソッド", "V60", "中粗", 20, 300, 93, 210, [
@@ -1536,19 +1523,95 @@ $("s-theme").addEventListener("change", async (e) => {
   await saveSettings();
 });
 
-/* ---------- 書き出しと読み込み ---------- */
+/* ---------- 書き出しと読み込み ---------- *
+ *  記録はこの端末の中にしかない。だから持ち出す道を2つ用意する。
+ *  JSON は自分で読み戻すためのもの（形をそのまま保つ）。
+ *  CSV は表計算やほかの道具へ渡すためのもの（1杯が1行になる）。
+ * ------------------------------------------------------------------ */
+function downloadFile(filename, text, mime) {
+  const blob = new Blob([text], { type: mime });
+  const a = document.createElement("a");
+  a.href = URL.createObjectURL(blob);
+  a.download = filename;
+  a.click();
+  setTimeout(() => URL.revokeObjectURL(a.href), 1000);
+}
+
+const today = () => new Date().toISOString().slice(0, 10);
+
+/* RFC 4180 に沿って組む。区切り・引用符・改行を含む値だけを引用符でくくり、
+   中の引用符は2つ重ねて逃がす。
+   先頭のBOMは Excel のため。これが無いと、日本語がそのまま化ける */
+function toCsv(headers, rows) {
+  const cell = (v) => {
+    const t = v == null ? "" : String(v);
+    return /[",\r\n]/.test(t) ? `"${t.replace(/"/g, '""')}"` : t;
+  };
+  return "\uFEFF" + [headers, ...rows].map((r) => r.map(cell).join(",")).join("\r\n") + "\r\n";
+}
+
+/* 時間は「3:00」と「180」の両方を出す。読むためと、並べ替え・計算のため */
+function brewsCsv() {
+  const headers = [
+    "日時", "豆", "焙煎所", "焙煎度", "器具", "挽き目", "ミル・目盛り",
+    "粉(g)", "湯(g)", "比率", "湯温(℃)", "抽出時間", "抽出秒数", "レシピ",
+    "総合評価", "酸味", "甘み", "苦味", "コク", "香り", "風味", "感想", "次はこうする",
+  ];
+  const rows = liveBrews().slice().reverse().map((b) => [
+    fmtDateTime(b.brewedAt),
+    b.bean, b.roaster, b.roast, b.method, b.grind, b.grinder,
+    b.doseG ?? "", b.waterG ?? "",
+    b.doseG && b.waterG ? ratioText(b.doseG, b.waterG) : "",
+    b.tempC ?? "",
+    b.timeSec ? fmtClock(b.timeSec) : "", b.timeSec ?? "",
+    b.recipeName,
+    b.rating || "",
+    ...TASTE_AXES.map(([key]) => b.taste?.[key] ?? ""),
+    (b.flavors || []).join(" / "),
+    b.notes, b.next,
+  ]);
+  return toCsv(headers, rows);
+}
+
+/* 手順は行を分けず、1つの欄にまとめる。1レシピ=1行のほうが表として扱いやすい */
+function recipesCsv() {
+  const headers = [
+    "レシピ名", "器具", "挽き目", "粉(g)", "湯(g)", "比率", "湯温(℃)",
+    "合計時間", "手順数", "手順", "メモ",
+  ];
+  const rows = liveRecipes().map((r) => {
+    const steps = (r.steps || []).slice().sort((a, b) => a.at - b.at);
+    const text = steps.map((st) =>
+      [fmtClock(st.at), st.label || KIND_LABEL[st.kind] || "", st.water ? `${st.water}g` : ""]
+        .filter(Boolean).join(" ")).join(" / ");
+    return [
+      r.name, r.method, r.grind, r.doseG ?? "", r.waterG ?? "",
+      ratioText(r.doseG, r.waterG), r.tempC ?? "",
+      fmtClock(r.totalSec || 0), steps.length, text, r.memo,
+    ];
+  });
+  return toCsv(headers, rows);
+}
+
 $("s-export").addEventListener("click", () => {
   const payload = {
     app: "BrewNote", version: APP_VERSION, exportedAt: new Date().toISOString(),
     recipes, brews, settings,
   };
-  const blob = new Blob([JSON.stringify(payload, null, 2)], { type: "application/json" });
-  const a = document.createElement("a");
-  a.href = URL.createObjectURL(blob);
-  a.download = `brewnote-${new Date().toISOString().slice(0, 10)}.json`;
-  a.click();
-  setTimeout(() => URL.revokeObjectURL(a.href), 1000);
+  downloadFile(`brewnote-${today()}.json`, JSON.stringify(payload, null, 2), "application/json");
   toast("書き出しました");
+});
+
+$("s-export-csv").addEventListener("click", () => {
+  if (!liveBrews().length) { toast("書き出せる記録がまだありません"); return; }
+  downloadFile(`brewnote-records-${today()}.csv`, brewsCsv(), "text/csv;charset=utf-8");
+  toast(`記録${liveBrews().length}件をCSVにしました`);
+});
+
+$("s-export-recipes-csv").addEventListener("click", () => {
+  if (!liveRecipes().length) { toast("書き出せるレシピがありません"); return; }
+  downloadFile(`brewnote-recipes-${today()}.csv`, recipesCsv(), "text/csv;charset=utf-8");
+  toast(`レシピ${liveRecipes().length}件をCSVにしました`);
 });
 
 $("s-import").addEventListener("click", () => $("s-import-file").click());
@@ -1577,7 +1640,7 @@ async function mergeImported(data) {
     const write = [];
     for (const raw of incoming) {
       if (!raw?.id) continue;
-      const rec = { ...raw, dirty: true };
+      const rec = { ...raw };
       const i = list.findIndex((x) => x.id === rec.id);
       if (i >= 0) {
         if ((rec.updatedAt || 0) <= (list[i].updatedAt || 0)) continue;
@@ -1590,7 +1653,6 @@ async function mergeImported(data) {
     }
     await idbPutMany(store, write);
   }
-  pushDirty();
   return count;
 }
 
@@ -1600,339 +1662,12 @@ $("s-restore-recipes").addEventListener("click", async () => {
   if (!add.length) { toast("すでに全部そろっています"); return; }
   recipes.push(...add);
   await idbPutMany("recipes", add);
-  pushDirty();
   renderRecipes(); renderHome(); renderSettings();
   toast(`${add.length}件を入れ直しました`);
 });
 
 /* ------------------------------------------------------------------ *
- * 8. Googleサインインと Supabase 同期
- *
- *    サインインしなければ、このアプリは一切ネットワークに触れない。
- *    サインインすると、GoogleのIDトークンをそのまま Supabase Auth に
- *    渡して署名検証済みのセッションを作り、レシピと記録を同期する。
- *    行レベルセキュリティ（RLS）により、各行は本人しか読み書きできない。
- *    テーブル定義は SUPABASE_SETUP.md を参照。
- * ------------------------------------------------------------------ */
-
-/* この2つはリポジトリのオーナーが用意する、アプリ固有の公開値。
-   anon key は RLS で守られる前提の公開鍵なので、埋め込んでよい。
-   OAuthクライアントIDは、配信するオリジンを Google Cloud の
-   「承認済みの JavaScript 生成元」に登録しておくこと */
-const SUPABASE_URL = "https://ubvqigsydtrrfcovvpxk.supabase.co";
-const SUPABASE_ANON_KEY = "sb_publishable_FXz2avQ5_H8i0c5YY1e3MQ_cc_BcBqN";
-const GOOGLE_CLIENT_ID = "942903543011-r2hgervtelhkqfqgs9g2qnokjsdjaj6r.apps.googleusercontent.com";
-
-const SUPABASE_SRC = "https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/umd/supabase.js";
-const GSI_SRC = "https://accounts.google.com/gsi/client";
-const TABLES = { recipes: "coffee_recipes", brews: "coffee_brews" };
-
-let supabaseClient = null;
-let gsiInitialized = false;
-const supabaseScript = { promise: null };
-const gsiScript = { promise: null };
-let cloudUserId = null;
-let pushTimer = 0;
-let realtimeChannel = null;
-
-const cloudConfigured = () => !!(SUPABASE_URL && SUPABASE_ANON_KEY);
-
-function loadScript(src, cache) {
-  if (cache.promise) return cache.promise;
-  cache.promise = new Promise((resolve, reject) => {
-    const s = document.createElement("script");
-    s.src = src; s.async = true; s.defer = true;
-    s.onload = () => resolve();
-    s.onerror = () => { cache.promise = null; reject(new Error("読み込めませんでした: " + src)); };
-    document.head.appendChild(s);
-  });
-  return cache.promise;
-}
-async function getSupabaseClient() {
-  if (!cloudConfigured()) return null;
-  if (supabaseClient) return supabaseClient;
-  if (!window.supabase?.createClient) await loadScript(SUPABASE_SRC, supabaseScript);
-  supabaseClient = window.supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
-  return supabaseClient;
-}
-
-function setSyncStatus(text, cls) {
-  const box = $("cloud-sync-status");
-  if (!box) return;
-  if (!text) { box.hidden = true; box.textContent = ""; return; }
-  box.hidden = false;
-  box.textContent = text;
-  box.className = `sync-status${cls ? ` ${cls}` : ""}`;
-}
-
-/* IDトークンの中身。ここで取り出す値は画面表示にしか使わない
-   （署名の検証は Supabase 側が行う） */
-function decodeJwtPayload(token) {
-  const seg = String(token).split(".")[1] || "";
-  const b64 = seg.replace(/-/g, "+").replace(/_/g, "/");
-  const padded = b64 + "=".repeat((4 - (b64.length % 4)) % 4);
-  const json = decodeURIComponent(
-    Array.from(atob(padded), (c) => `%${c.charCodeAt(0).toString(16).padStart(2, "0")}`).join(""));
-  return JSON.parse(json);
-}
-
-function renderGoogleUser(user) {
-  const profile = $("google-profile");
-  if (!user) { profile.hidden = true; return; }
-  $("google-name").textContent = user.name || "(名前なし)";
-  $("google-email").textContent = user.email || "";
-  const avatar = $("google-avatar");
-  if (user.picture) { avatar.src = user.picture; avatar.hidden = false; } else { avatar.hidden = true; }
-  profile.hidden = false;
-  $("google-signin-btn").innerHTML = "";
-}
-
-async function handleGoogleCredential(response) {
-  try {
-    const payload = decodeJwtPayload(response.credential);
-    const user = {
-      sub: payload.sub || "", name: payload.name || "",
-      email: payload.email || "", picture: payload.picture || "",
-    };
-    await kvSet("google_user", user);
-    renderGoogleUser(user);
-    $("google-status").textContent = "";
-    toast(`${user.name || user.email} でサインインしました`);
-    await signInToCloud(response.credential);
-  } catch (err) {
-    console.warn("サインイン情報を読めませんでした:", err);
-    $("google-status").textContent = "サインイン情報を読み取れませんでした。";
-  }
-}
-
-async function initGoogleAuth() {
-  const status = $("google-status");
-  const slot = $("google-signin-btn");
-  const user = await kvGet("google_user", null);
-  renderGoogleUser(user);
-
-  /* プロフィールは IndexedDB に残るが、Supabase のセッションは
-     localStorage にあり端末の都合で消える。繋がっていないなら、
-     見た目が「サインイン済み」でも入り口を必ず出す */
-  const disconnected = cloudConfigured() && !cloudUserId;
-  if (user && !disconnected) { status.textContent = ""; return; }
-
-  slot.innerHTML = "";
-  if (!GOOGLE_CLIENT_ID) { status.textContent = "Googleサインインは未設定です。"; return; }
-  try {
-    if (!window.google?.accounts?.id) await loadScript(GSI_SRC, gsiScript);
-    if (!gsiInitialized) {
-      window.google.accounts.id.initialize({
-        client_id: GOOGLE_CLIENT_ID,
-        callback: handleGoogleCredential,
-        auto_select: !!user,
-      });
-      gsiInitialized = true;
-    }
-    window.google.accounts.id.renderButton(slot, {
-      theme: "outline", size: "large", shape: "pill", text: "signin_with", locale: "ja",
-    });
-    status.textContent = user ? "同期の接続が切れています。もう一度サインインしてください。" : "";
-    if (user) {
-      try { window.google.accounts.id.prompt(); } catch (err) { /* One Tapが出せないだけ */ }
-    }
-  } catch (err) {
-    console.warn("Googleサインインを初期化できませんでした:", err);
-    status.textContent = "Googleサインインを準備できませんでした。通信を確かめてください。";
-  }
-}
-
-$("google-signout-btn").addEventListener("click", async () => {
-  if (window.google?.accounts?.id) window.google.accounts.id.disableAutoSelect();
-  await idbDelete("kv", "google_user");
-  renderGoogleUser(null);
-  stopRealtime();
-  cloudUserId = null;
-  setSyncStatus("");
-  try { await supabaseClient?.auth.signOut(); } catch (err) { console.warn("サインアウトに失敗:", err); }
-  toast("サインアウトしました");
-  await initGoogleAuth();
-});
-
-$("cloud-retry-btn").addEventListener("click", async () => {
-  $("cloud-retry-btn").hidden = true;
-  await syncNow();
-});
-
-async function signInToCloud(idToken) {
-  if (!cloudConfigured()) return;
-  setSyncStatus("同期中…", "syncing");
-  try {
-    const sb = await getSupabaseClient();
-    const { data, error } = await sb.auth.signInWithIdToken({ provider: "google", token: idToken });
-    if (error) throw error;
-    cloudUserId = data.user.id;
-    await initGoogleAuth();
-    await syncNow();
-    startRealtime();
-  } catch (err) {
-    console.warn("Supabaseへのサインインに失敗しました:", err);
-    setSyncStatus("同期を始められませんでした。", "error");
-    $("cloud-retry-btn").hidden = false;
-  }
-}
-
-async function restoreCloudSession() {
-  if (!cloudConfigured()) return;
-  try {
-    const sb = await getSupabaseClient();
-    const { data } = await sb.auth.getSession();
-    if (data?.session?.user) {
-      cloudUserId = data.session.user.id;
-      await syncNow();
-      startRealtime();
-      return;
-    }
-    if (await kvGet("google_user", null)) {
-      setSyncStatus("同期の接続が切れています。サインインし直してください。", "error");
-    }
-  } catch (err) {
-    console.warn("セッションを戻せませんでした:", err);
-  }
-}
-
-const toRow = (rec) => ({
-  user_id: cloudUserId,
-  id: rec.id,
-  data: { ...rec, dirty: undefined },
-  deleted: !!rec.deleted,
-  updated_at: rec.updatedAt || Date.now(),
-});
-const fromRow = (row) => ({
-  ...(row.data || {}),
-  id: row.id,
-  deleted: !!row.deleted,
-  updatedAt: Number(row.updated_at) || 0,
-  dirty: false,
-});
-
-/* 端末とサーバの両方に同じidがあれば、updatedAt が新しいほうを採る。
-   時計のずれで負けることはあるが、消えるより上書きのほうが直しやすい */
-async function pullCloud() {
-  const sb = await getSupabaseClient();
-  for (const [key, table] of Object.entries(TABLES)) {
-    const { data, error } = await sb.from(table).select("*").eq("user_id", cloudUserId);
-    if (error) throw error;
-    const list = key === "recipes" ? recipes : brews;
-    const write = [];
-    for (const row of data || []) {
-      const remote = fromRow(row);
-      const i = list.findIndex((x) => x.id === remote.id);
-      if (i >= 0) {
-        if ((list[i].updatedAt || 0) >= remote.updatedAt) continue;
-        list[i] = remote;
-      } else {
-        list.push(remote);
-      }
-      write.push(remote);
-    }
-    await idbPutMany(key, write);
-  }
-}
-
-async function pushCloud() {
-  const sb = await getSupabaseClient();
-  for (const [key, table] of Object.entries(TABLES)) {
-    const list = key === "recipes" ? recipes : brews;
-    const dirty = list.filter((r) => r.dirty);
-    if (!dirty.length) continue;
-    const { error } = await sb.from(table).upsert(dirty.map(toRow));
-    if (error) throw error;
-    for (const rec of dirty) rec.dirty = false;
-    await idbPutMany(key, dirty);
-  }
-}
-
-let syncing = false;
-async function syncNow() {
-  if (!cloudUserId || syncing) return;
-  syncing = true;
-  setSyncStatus("同期中…", "syncing");
-  try {
-    await pullCloud();
-    await pushCloud();
-    setSyncStatus("同期しました", "ok");
-    $("cloud-retry-btn").hidden = true;
-    renderHome(); renderLog(); renderRecipes(); renderSettings();
-  } catch (err) {
-    console.warn("同期に失敗しました:", err);
-    setSyncStatus(cloudErrorText(err), "error");
-    $("cloud-retry-btn").hidden = false;
-  } finally {
-    syncing = false;
-  }
-}
-
-/* 失敗の理由はたいていアプリの外にある。何を直せばよいか分かる文にする */
-function cloudErrorText(err) {
-  const msg = String(err?.message || err || "");
-  if (/relation .* does not exist|schema cache|42P01/i.test(msg)) {
-    return "同期先のテーブルがありません（SUPABASE_SETUP.md のSQLを実行してください）";
-  }
-  if (/JWT|token|401/i.test(msg)) return "サインインの期限が切れました。サインインし直してください。";
-  if (/Failed to fetch|NetworkError/i.test(msg)) return "通信できませんでした。電波を確かめてください。";
-  return "同期に失敗しました。";
-}
-
-/* 保存のたびに投げると通信が増えるので、少しだけ待ってまとめる */
-function pushDirty() {
-  if (!cloudUserId) return;
-  clearTimeout(pushTimer);
-  pushTimer = setTimeout(() => {
-    pushCloud().catch((err) => {
-      console.warn("送信に失敗しました:", err);
-      setSyncStatus(cloudErrorText(err), "error");
-      $("cloud-retry-btn").hidden = false;
-    });
-  }, 800);
-}
-
-/* 別の端末での追加・変更をその場で受け取る。張れなくても、
-   次にアプリを開いたときの同期で追いつくので致命的ではない */
-function startRealtime() {
-  if (!supabaseClient || !cloudUserId || realtimeChannel) return;
-  try {
-    realtimeChannel = supabaseClient.channel("brewnote-sync");
-    for (const [key, table] of Object.entries(TABLES)) {
-      realtimeChannel.on("postgres_changes",
-        { event: "*", schema: "public", table, filter: `user_id=eq.${cloudUserId}` },
-        (payload) => applyRemoteRow(key, payload.new || payload.old));
-    }
-    realtimeChannel.subscribe();
-  } catch (err) {
-    console.warn("リアルタイム購読を張れませんでした:", err);
-  }
-}
-function stopRealtime() {
-  if (!realtimeChannel) return;
-  try { supabaseClient?.removeChannel(realtimeChannel); } catch (err) { /* もう無い */ }
-  realtimeChannel = null;
-}
-
-async function applyRemoteRow(key, row) {
-  if (!row?.id) return;
-  const remote = fromRow(row);
-  const list = key === "recipes" ? recipes : brews;
-  const i = list.findIndex((x) => x.id === remote.id);
-  if (i >= 0) {
-    if ((list[i].updatedAt || 0) >= remote.updatedAt) return;
-    list[i] = remote;
-  } else {
-    list.push(remote);
-  }
-  await idbPut(key, remote);
-  renderHome(); renderLog(); renderRecipes();
-}
-
-window.addEventListener("online", () => { if (cloudUserId) syncNow(); });
-
-/* ------------------------------------------------------------------ *
- * 9. 起動
+ * 8. 起動
  * ------------------------------------------------------------------ */
 for (const btn of document.querySelectorAll("[data-nav]")) {
   btn.addEventListener("click", () => {
@@ -1988,9 +1723,6 @@ async function boot() {
     navigator.serviceWorker.register("sw.js", { scope: "./" })
       .catch((err) => console.warn("Service Workerを登録できませんでした:", err));
   }
-
-  /* 通信が要るものは、画面を出したあとで静かに始める */
-  restoreCloudSession().then(() => initGoogleAuth());
 }
 
 boot().catch((err) => {
