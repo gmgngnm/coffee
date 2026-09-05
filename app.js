@@ -19,11 +19,11 @@
  *   8. 起動
  * ==================================================================== */
 
-const APP_VERSION = "1.6.0";
+const APP_VERSION = "1.6.1";
 
 /* ホームのロゴの下に #002 の形で出す、mainへマージした回数。
    マージのたびに1つ増やす（この見た目になるまでに何回積んだか） */
-const MERGE_COUNT = 7;
+const MERGE_COUNT = 8;
 
 /* ------------------------------------------------------------------ *
  * 1. 下ごしらえ
@@ -626,7 +626,7 @@ function stopTimerLoop() {
   timer.rafId = 0;
 }
 
-/* 手順の時刻をまたいだ瞬間に、画面・声・振動で知らせる。
+/* 手順の時刻をまたいだ瞬間に、振動で知らせる。
    （音そのものは先に予約済みなので、ここでは鳴らさない）
    背面に回っていた間に複数をまたいだときは、最後の1つだけ知らせる。
    3つ前の指示を今さら読み上げても混乱するだけなので */
@@ -639,10 +639,6 @@ function announceCrossedSteps(steps, elapsedSec) {
   timer.firedIdx = last;
   const step = steps[last];
   buzz(step.kind === "finish" ? [120, 80, 120, 80, 220] : [90]);
-  const flash = $("dial-flash");
-  flash.classList.remove("ring");
-  void flash.offsetWidth;              // アニメーションをやり直させる
-  flash.classList.add("ring");
 }
 
 /* ------------------------------------------------------------------ *
