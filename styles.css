@@ -7,10 +7,15 @@
   --ink:#17211C;
   --ink-soft:#4B584F;
   --ink-faint:#7C897E;
-  --accent:#1F6F63;
-  --accent-ink:#0E3A33;
-  --accent-2:#E2622F;
-  --accent-soft:#DDEBE6;
+  /* アクセントはコーヒーの色。焙煎度の選択に応じて app.js が差し替える
+     （既定は中煎り）。派生の2色は色を混ぜて作るので、どの焙煎度でも
+     明るい面・暗い面それぞれで読める側へ自動的に寄る */
+  --accent:#7C4522;
+  --accent-ink:#42230F;
+  --accent-ink:color-mix(in srgb, var(--accent) 72%, var(--ink));
+  --accent-soft:#F2E8E1;
+  --accent-soft:color-mix(in srgb, var(--accent) 12%, var(--surface));
+  --accent-2:#C2703A;
   --line:#D6DBCF;
   --danger:#C74B3F;
   --brand-blue:#2F6FED;
@@ -21,8 +26,11 @@
   :root:not([data-theme="light"]){
     --bg:#101711; --surface:#182019; --surface-2:#202A21;
     --ink:#ECF1E8; --ink-soft:#AAB6A4; --ink-faint:#7E8B80;
-    --accent:#4FBFA8; --accent-ink:#BEEFE1; --accent-2:#F0855A;
-    --accent-soft:#1D2E28;
+    --accent:#D39455; --accent-2:#E8A76A;
+    --accent-ink:#EBD6C0;
+    --accent-ink:color-mix(in srgb, var(--accent) 72%, var(--ink));
+    --accent-soft:#2A2119;
+    --accent-soft:color-mix(in srgb, var(--accent) 12%, var(--surface));
     --line:#2A342A; --danger:#E27B70; --brand-blue:#7CA2FF;
     --shadow: 0 1px 2px rgba(0,0,0,0.35), 0 8px 24px rgba(0,0,0,0.4);
   }
@@ -30,8 +38,11 @@
 :root[data-theme="dark"]{
   --bg:#101711; --surface:#182019; --surface-2:#202A21;
   --ink:#ECF1E8; --ink-soft:#AAB6A4; --ink-faint:#7E8B80;
-  --accent:#4FBFA8; --accent-ink:#BEEFE1; --accent-2:#F0855A;
-  --accent-soft:#1D2E28;
+  --accent:#D39455; --accent-2:#E8A76A;
+  --accent-ink:#EBD6C0;
+  --accent-ink:color-mix(in srgb, var(--accent) 72%, var(--ink));
+  --accent-soft:#2A2119;
+  --accent-soft:color-mix(in srgb, var(--accent) 12%, var(--surface));
   --line:#2A342A; --danger:#E27B70; --brand-blue:#7CA2FF;
   --shadow: 0 1px 2px rgba(0,0,0,0.35), 0 8px 24px rgba(0,0,0,0.4);
 }
@@ -385,6 +396,24 @@ input[type="range"]::-moz-range-thumb{
 .w-time{width:74px;flex:none;}
 .w-kind{width:96px;flex:none;}
 .w-water{width:78px;flex:none;}
+
+/* ---------- 焙煎度の見本 ---------- */
+.roast-row{display:flex;gap:10px;justify-content:space-between;margin-bottom:6px;}
+.roast-swatch{
+  flex:1;background:none;border:none;padding:0;display:flex;flex-direction:column;
+  align-items:center;gap:6px;color:var(--ink-faint);
+}
+.roast-dot{
+  width:38px;height:38px;border-radius:50%;border:2px solid transparent;
+  box-shadow:var(--shadow);position:relative;
+}
+.roast-swatch.on{color:var(--accent-ink);font-weight:700;}
+.roast-swatch.on .roast-dot{border-color:var(--ink);}
+.roast-swatch.on .roast-dot::after{
+  content:"✓";position:absolute;inset:0;display:flex;align-items:center;justify-content:center;
+  color:#fff;font-size:15px;font-weight:700;text-shadow:0 1px 2px rgba(0,0,0,.45);
+}
+.roast-name{font-size:10px;font-family:'JetBrains Mono',ui-monospace,monospace;line-height:1.2;text-align:center;}
 
 /* ---------- タブバー ---------- */
 .tabbar{

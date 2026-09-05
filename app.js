@@ -19,11 +19,11 @@
  *   8. 起動
  * ==================================================================== */
 
-const APP_VERSION = "1.2.0";
+const APP_VERSION = "1.3.0";
 
 /* ホームのロゴの下に #002 の形で出す、mainへマージした回数。
    マージのたびに1つ増やす（この見た目になるまでに何回積んだか） */
-const MERGE_COUNT = 3;
+const MERGE_COUNT = 4;
 
 /* ------------------------------------------------------------------ *
  * 1. 下ごしらえ
@@ -196,6 +196,19 @@ const kvSet = (k, v) => idbPut("kv", { k, v });
 /* ------------------------------------------------------------------ *
  * 3. 設定
  * ------------------------------------------------------------------ */
+/* アクセントはコーヒーの色だけで作る。浅煎りから深煎りへ、豆の色が
+   深くなる順に並べている。明るい面では白文字を載せるので濃いめの側を、
+   暗い面では暗い文字を載せるので明るめの側を使う。どの段も、それぞれの
+   面に対して4.5:1以上の明暗差がある */
+const ROASTS = [
+  { id: "light",       name: "浅煎り",   light: "#956026", dark: "#EAB77C" },
+  { id: "medium-light", name: "中浅煎り", light: "#8A5324", dark: "#DFA666" },
+  { id: "medium",      name: "中煎り",   light: "#7C4522", dark: "#D39455" },
+  { id: "medium-dark", name: "中深煎り", light: "#65351E", dark: "#C7864B" },
+  { id: "dark",        name: "深煎り",   light: "#4B2517", dark: "#BA7A45" },
+];
+const findRoast = (id) => ROASTS.find((r) => r.id === id) || ROASTS[2];
+
 const DEFAULT_SETTINGS = {
   chime: true,       // 手順の時刻にチーンと鳴らす
   precue: true,      // 3秒前に小さく予告する
@@ -204,17 +217,26 @@ const DEFAULT_SETTINGS = {
   wakelock: true,    // タイマー中は画面を消さない
   volume: 70,
   theme: "auto",
+  roast: "medium",   // アクセントの焙煎度
 };
 let settings = { ...DEFAULT_SETTINGS };
+
+/* いま実際に暗い面かどうか。設定が「端末に合わせる」のときだけ端末に訊く */
+function isDarkNow() {
+  if (settings.theme === "dark") return true;
+  if (settings.theme === "light") return false;
+  return matchMedia("(prefers-color-scheme: dark)").matches;
+}
 
 function applyTheme() {
   const root = document.documentElement;
   if (settings.theme === "auto") root.removeAttribute("data-theme");
   else root.setAttribute("data-theme", settings.theme);
-  const dark = settings.theme === "dark"
-    || (settings.theme === "auto" && matchMedia("(prefers-color-scheme: dark)").matches);
+  const dark = isDarkNow();
+  const roast = findRoast(settings.roast);
+  root.style.setProperty("--accent", dark ? roast.dark : roast.light);
   const meta = document.querySelector('meta[name="theme-color"]');
-  if (meta) meta.setAttribute("content", dark ? "#101711" : "#1F6F63");
+  if (meta) meta.setAttribute("content", dark ? "#101711" : roast.light);
 }
 
 async function saveSettings() {
@@ -1504,6 +1526,7 @@ function renderSettings() {
   $("s-volume").value = String(settings.volume);
   $("s-volume-out").textContent = `${settings.volume}%`;
   $("s-theme").value = settings.theme;
+  renderRoastPicker();
   $("app-version").textContent = `v${APP_VERSION}`;
   $("s-data-note").textContent =
     `この端末に レシピ ${liveRecipes().length}件 / 記録 ${liveBrews().length}件`;
@@ -1522,10 +1545,39 @@ $("s-volume").addEventListener("input", (e) => {
 });
 $("s-volume").addEventListener("change", saveSettings);
 $("s-test-chime").addEventListener("click", () => { playSoundNow("step"); speak("2投目。160グラムまで"); });
+/* 見本の丸は、いま見えている面での色をそのまま塗る。選んだ結果が
+   そのとおりに出るほうが、選びやすい */
+function renderRoastPicker() {
+  const box = $("s-roast");
+  if (!box) return;
+  const dark = isDarkNow();
+  box.innerHTML = "";
+  for (const roast of ROASTS) {
+    const btn = el("button", `roast-swatch${roast.id === settings.roast ? " on" : ""}`);
+    btn.type = "button";
+    btn.setAttribute("aria-label", roast.name);
+    const dot = el("span", "roast-dot");
+    dot.style.background = dark ? roast.dark : roast.light;
+    btn.appendChild(dot);
+    btn.appendChild(el("span", "roast-name", roast.name));
+    btn.addEventListener("click", async () => {
+      settings.roast = roast.id;
+      applyTheme();
+      await saveSettings();
+      renderRoastPicker();
+      toast(`${roast.name}の色にしました`);
+    });
+    box.appendChild(btn);
+  }
+  const note = $("s-roast-note");
+  if (note) note.textContent = `いまは${findRoast(settings.roast).name}。豆の色が深くなるほど、差し色も深くなります。`;
+}
+
 $("s-theme").addEventListener("change", async (e) => {
   settings.theme = e.target.value;
   applyTheme();
   await saveSettings();
+  renderRoastPicker();
 });
 
 /* ---------- CSVで持ち出す ---------- *
@@ -1653,7 +1705,10 @@ window.addEventListener("beforeunload", (e) => {
 async function boot() {
   settings = { ...DEFAULT_SETTINGS, ...(await kvGet("settings", {})) };
   applyTheme();
-  matchMedia("(prefers-color-scheme: dark)").addEventListener?.("change", applyTheme);
+  matchMedia("(prefers-color-scheme: dark)").addEventListener?.("change", () => {
+    applyTheme();
+    renderRoastPicker();
+  });
 
   recipes = await idbAll("recipes");
   brews = await idbAll("brews");
