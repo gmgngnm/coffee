@@ -19,11 +19,11 @@
  *   8. 起動
  * ==================================================================== */
 
-const APP_VERSION = "1.6.1";
+const APP_VERSION = "1.7.0";
 
 /* ホームのロゴの下に #002 の形で出す、mainへマージした回数。
    マージのたびに1つ増やす（この見た目になるまでに何回積んだか） */
-const MERGE_COUNT = 8;
+const MERGE_COUNT = 9;
 
 /* ------------------------------------------------------------------ *
  * 1. 下ごしらえ
@@ -771,15 +771,108 @@ function renderStats(box, list) {
 }
 
 /* ---------- タイマーの見た目 ---------- */
-const RING_OUTER = 2 * Math.PI * 88;   // 抽出の終わりまで
-const RING_INNER = 2 * Math.PI * 70;   // その回の終わりまで
+/* ------------------------------------------------------------------ *
+ *  ダイヤル
+ *
+ *  2本の輪を、縦軸まわりに回しながら描く。回る量は進み具合そのもので、
+ *  1周ぶん進むと輪もちょうど1回転する。外側（抽出の全体）と内側
+ *  （その回）は逆向きに回す。
+ *
+ *  輪は板ではなく円筒として扱う。板だと真横を向いた瞬間に線が消えて
+ *  しまうが、円筒なら太さのぶんの帯として見え続ける。そのために、
+ *  輪を細かい区間に割って奥から順に描き、奥ほど背景に沈ませている。
+ *  SVGでは奥行きを持てないので、ここだけcanvasで描く。
+ * ------------------------------------------------------------------ */
+const TAU = Math.PI * 2;
+const RING_SEGMENTS = 120;     // 輪を割る数。多いほど滑らかで、その分重い
+const RING_FOCAL = 560;        // 焦点距離（200単位系）。小さいほど遠近が強い
+const RINGS = {
+  /* 手前に来た区間は遠近で太くなるので、半径は canvas の縁から少し引く */
+  /* 向きは、進んだ側（濃い弧）が手前を向くほうを選ぶ。逆に回すと、
+     真横を向いた瞬間に弧が裏側へ隠れて進み具合が読めなくなる */
+  total: { radius: 85, tube: 11, dir: -1, fade: 0 },
+  step:  { radius: 67, tube: 8,  dir:  1, fade: 0.3 },   // 内側は一段下げて添える
+};
 
-/* 進み具合(0〜1)を、リングの描き残しに変える */
-function setRing(id, circumference, progress) {
-  const p = Math.max(0, Math.min(1, progress || 0));
-  $(id).style.strokeDashoffset = String(circumference * (1 - p));
+function hexToRgb(hex) {
+  const h = String(hex).trim().replace("#", "");
+  const v = h.length === 3 ? h.split("").map((c) => c + c).join("") : h;
+  const n = parseInt(v, 16);
+  return Number.isFinite(n) ? [(n >> 16) & 255, (n >> 8) & 255, n & 255] : [0, 0, 0];
 }
 
+/* 奥行きは、透かさずに「背景の色へ寄せる」ことで出す。
+   半透明で重ねると、区間どうしの端が二重に乗って数珠のように粒立つ。
+   不透明なら手前が奥を素直に隠すので、輪どうしの前後もそのまま出る */
+function towardBg(rgb, bg, t) {
+  const k = Math.max(0, Math.min(1, t));
+  return `rgb(${Math.round(rgb[0] + (bg[0] - rgb[0]) * k)},`
+       + `${Math.round(rgb[1] + (bg[1] - rgb[1]) * k)},`
+       + `${Math.round(rgb[2] + (bg[2] - rgb[2]) * k)})`;
+}
+
+/* 輪1本ぶんの区間。画面に落とした座標と奥行きを持たせて返す */
+function ringSegments(spec, progress) {
+  const p = Math.max(0, Math.min(1, progress || 0));
+  const theta = spec.dir * p * TAU;
+  const cos = Math.cos(theta), sin = Math.sin(theta);
+  const at = (a) => {
+    const x = spec.radius * Math.cos(a);
+    const y = spec.radius * Math.sin(a);
+    const z = -x * sin;                       // 回した後の奥行き
+    const k = RING_FOCAL / (RING_FOCAL - z);  // 手前ほど大きく
+    return { x: 100 + x * cos * k, y: 100 + y * k, z, k };
+  };
+  const out = [];
+  for (let i = 0; i < RING_SEGMENTS; i++) {
+    const p0 = at((i / RING_SEGMENTS) * TAU - Math.PI / 2);
+    const p1 = at(((i + 1) / RING_SEGMENTS) * TAU - Math.PI / 2);
+    const z = (p0.z + p1.z) / 2;
+    out.push({
+      p0, p1, spec, z,
+      depth: (z / spec.radius + 1) / 2,        // 0=奥 1=手前
+      lit: (i + 0.5) / RING_SEGMENTS <= p,     // ここまで進んだ区間か
+    });
+  }
+  return out;
+}
+
+function drawDial(totalP, stepP, showStep) {
+  const canvas = $("dial-canvas");
+  const size = canvas.clientWidth;
+  if (!size) return;
+  const dpr = Math.min(2, window.devicePixelRatio || 1);
+  const px = Math.round(size * dpr);
+  if (canvas.width !== px) { canvas.width = px; canvas.height = px; }
+
+  const ctx = canvas.getContext("2d");
+  const k = px / 200;                          // 200単位系で描いて、最後に実寸へ
+  ctx.setTransform(k, 0, 0, k, 0, 0);
+  ctx.clearRect(0, 0, 200, 200);
+
+  const css = getComputedStyle(document.documentElement);
+  const on = hexToRgb(css.getPropertyValue("--accent"));
+  const off = hexToRgb(css.getPropertyValue("--line"));
+  const bg = hexToRgb(css.getPropertyValue("--bg"));
+
+  /* 2本まとめて奥から描く。真横を向いたとき、内外が正しく重なる */
+  let segs = ringSegments(RINGS.total, totalP);
+  if (showStep) segs = segs.concat(ringSegments(RINGS.step, stepP));
+  segs.sort((a, b) => a.z - b.z);
+
+  ctx.lineCap = "round";
+  for (const s of segs) {
+    const fade = 0.62 * (1 - s.depth) + s.spec.fade * (s.lit ? 1 : 0.5);
+    ctx.strokeStyle = towardBg(s.lit ? on : off, bg, fade);
+    ctx.lineWidth = s.spec.tube * ((s.p0.k + s.p1.k) / 2);
+    ctx.beginPath();
+    ctx.moveTo(s.p0.x, s.p0.y);
+    ctx.lineTo(s.p1.x, s.p1.y);
+    ctx.stroke();
+  }
+}
+
+/* ---------- タイマーの見た目 ---------- */
 function renderTimerStatic() {
   const free = !timer.recipe;
 
@@ -843,8 +936,7 @@ function renderTimerLive() {
 
   if (!timer.recipe) {
     /* レシピなしのときは経過そのものが主役。外側を1分で一周させる */
-    $("dial").classList.add("no-steps");
-    setRing("ring-total", RING_OUTER, (elapsedSec % 60) / 60);
+    drawDial((elapsedSec % 60) / 60, 0, false);
     main.textContent = fmtClock(elapsedSec);
     main.classList.remove("with-unit");
     sub.textContent = timer.laps.length ? `${timer.laps.length}` : "";
@@ -857,9 +949,6 @@ function renderTimerLive() {
   const total = timerTotalSec();
   if (timer.state === "running") announceCrossedSteps(steps, elapsedSec);
 
-  $("dial").classList.remove("no-steps");
-  setRing("ring-total", RING_OUTER, elapsedSec / (total || 1));
-
   let curIdx = -1;
   for (let i = 0; i < steps.length; i++) if (steps[i].at <= elapsedSec) curIdx = i; else break;
   const next = steps[curIdx + 1] || null;
@@ -869,8 +958,9 @@ function renderTimerLive() {
   const stepFrom = curIdx >= 0 ? steps[curIdx].at : 0;
   const stepTo = next ? next.at : total;
   const span = stepTo - stepFrom;
-  setRing("ring-step", RING_INNER,
-    timer.state === "idle" ? 0 : (span > 0 ? (elapsedSec - stepFrom) / span : 1));
+  const stepProgress = timer.state === "idle" ? 0
+    : (span > 0 ? (elapsedSec - stepFrom) / span : 1);
+  drawDial(elapsedSec / (total || 1), stepProgress, true);
 
   /* 主役は「この回に注ぐ量」。始める前は、これから注ぐ1投目を見せておく。
      数字にならない手順（混ぜる・押す）のときだけ、ことばに入れ替える */
