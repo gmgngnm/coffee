@@ -355,23 +355,6 @@
       <div class="nav-icons"></div>
     </div>
     <div class="scroll-area">
-      <h3 class="form-head">アカウント</h3>
-      <p class="form-hint">Googleでサインインすると、記録とレシピが端末をまたいで同期されます。サインインしなければ、この端末の中だけで完結します。</p>
-      <div class="account-box">
-        <div class="google-profile" id="google-profile" hidden>
-          <img class="google-avatar" id="google-avatar" alt="" hidden>
-          <div class="google-who">
-            <div class="google-name" id="google-name"></div>
-            <div class="google-email" id="google-email"></div>
-          </div>
-          <button class="text-btn" id="google-signout-btn" type="button">サインアウト</button>
-        </div>
-        <div id="google-signin-btn"></div>
-        <div class="hint" id="google-status"></div>
-        <div class="sync-status" id="cloud-sync-status" hidden></div>
-        <button class="text-btn" id="cloud-retry-btn" type="button" hidden>同期をやり直す</button>
-      </div>
-
       <h3 class="form-head">音と知らせ</h3>
       <label class="switch-row">
         <span><strong>チャイム</strong><small>手順の時刻に鳴らす</small></span>
@@ -410,11 +393,17 @@
       </div>
 
       <h3 class="form-head">データ</h3>
+      <p class="form-hint">記録はこの端末の中にだけあります。アカウントも、送信先のサーバもありません。端末を移るとき・残しておきたいときは、ここから書き出してください。</p>
       <div class="btn-row">
         <button class="wide-btn ghost" id="s-export" type="button">書き出す（JSON）</button>
         <button class="wide-btn ghost" id="s-import" type="button">読み込む（JSON）</button>
       </div>
       <input id="s-import-file" type="file" accept="application/json,.json" hidden>
+      <div class="btn-row">
+        <button class="wide-btn ghost" id="s-export-csv" type="button">記録をCSVで</button>
+        <button class="wide-btn ghost" id="s-export-recipes-csv" type="button">レシピをCSVで</button>
+      </div>
+      <p class="form-hint">JSONは、このアプリでそのまま読み戻せます（形が崩れません）。CSVは、表計算ソフトで開いて並べ替えたりグラフにしたりするためのものです。読み込めるのはJSONだけです。</p>
       <button class="text-btn" id="s-restore-recipes" type="button">はじめから入っているレシピを入れ直す</button>
       <p class="hint" id="s-data-note"></p>
       <p class="hint version-note">BrewNote <span id="app-version"></span></p>

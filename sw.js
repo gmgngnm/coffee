@@ -1,7 +1,7 @@
 /* 台所で使うアプリなので、電波が届かない場所でも開けるようにしておく。
    ただし更新に気づかないのは困るので、オンラインならネットワークを
    先に見て、落ちたときだけキャッシュを返す */
-const CACHE = "brewnote-shell-v1";
+const CACHE = "brewnote-shell-v2";
 const SHELL = [
   "./index.html",
   "./styles.css",
@@ -27,7 +27,7 @@ self.addEventListener("activate", (e) => {
 
 self.addEventListener("fetch", (e) => {
   const url = new URL(e.request.url);
-  /* Supabase や Google のリクエストには触らない */
+  /* 外部（Webフォントなど）には触らない */
   if (url.origin !== self.location.origin) return;
   if (e.request.method !== "GET") return;
 
