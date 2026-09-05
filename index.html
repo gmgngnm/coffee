@@ -66,9 +66,11 @@
 
     <div class="scroll-area timer-body">
       <div class="dial-wrap">
-        <svg class="dial" viewBox="0 0 200 200" aria-hidden="true">
-          <circle class="dial-track" cx="100" cy="100" r="88"/>
-          <circle class="dial-progress" id="dial-progress" cx="100" cy="100" r="88"/>
+        <svg class="dial" id="dial" viewBox="0 0 200 200" aria-hidden="true">
+          <circle class="dial-track outer" cx="100" cy="100" r="88"/>
+          <circle class="dial-ring outer" id="ring-total" cx="100" cy="100" r="88"/>
+          <circle class="dial-track inner" cx="100" cy="100" r="70"/>
+          <circle class="dial-ring inner" id="ring-step" cx="100" cy="100" r="70"/>
         </svg>
         <div class="dial-center">
           <div class="dial-main mono" id="dial-main">—</div>
