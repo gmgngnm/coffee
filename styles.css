@@ -127,7 +127,8 @@ input,select,textarea{font-family:inherit;}
  * ------------------------------------------------------------------ */
 .home-logo{display:flex;align-items:flex-end;flex-shrink:0;}
 /* 幅の狭い端末では、右のボタンとぶつからないところまで小さくする */
-.home-logo .logo-word{font-size:clamp(18px, 5.8vw, 23px);}
+.home-logo .logo-word{font-size:22px;}
+@media (min-width:360px){ .home-logo .logo-word{font-size:27px;} }
 .build-tag{
   align-self:flex-end;position:relative;bottom:1px;margin-left:5px;
   font-size:9.5px;color:var(--ink-faint);font-family:var(--font-mono);
@@ -136,8 +137,8 @@ input,select,textarea{font-family:inherit;}
 
 /* ---------- ホーム ---------- */
 .greeting{
-  font-family:var(--font-ui);font-size:21px;margin:16px auto 18px;color:var(--ink);
-  letter-spacing:.02em;text-align:center;max-width:20ch;line-height:1.35;
+  font-family:var(--font-ui);font-size:17px;margin:16px auto 18px;color:var(--ink-soft);
+  letter-spacing:.02em;text-align:center;max-width:26ch;line-height:1.4;
 }
 .stat-strip{display:flex;gap:8px;margin-bottom:18px;}
 .stat{
@@ -271,6 +272,27 @@ input,select,textarea{font-family:inherit;}
 .timer-body{
   flex:1;display:flex;flex-direction:column;align-items:center;justify-content:center;
   gap:26px;padding:0 18px;
+}
+/* ---------- いまの投の帯 ---------- *
+ *  円は淹れ全体の形を見せる。ここは今この投のなかのどこにいるかだけを、
+ *  始まりの時刻と次の合図の時刻を添えて出す
+ * ------------------------------------------------------------------ */
+.lane{
+  display:flex;align-items:center;gap:10px;width:min(78vw,286px);
+  margin-bottom:-8px;
+}
+.lane-time{font-size:11.5px;color:var(--ink-faint);letter-spacing:.02em;}
+.lane-track{
+  position:relative;flex:1;height:3px;border-radius:2px;
+  background:color-mix(in srgb, var(--accent) 16%, transparent);
+}
+.lane-fill{
+  position:absolute;left:0;top:0;bottom:0;border-radius:2px;
+  background:var(--accent);width:0;
+}
+.lane-dot{
+  position:absolute;top:50%;width:7px;height:7px;border-radius:50%;
+  background:var(--accent);transform:translate(-50%,-50%);left:0;
 }
 .timer-foot{padding:0 18px calc(24px + env(safe-area-inset-bottom));flex-shrink:0;}
 
