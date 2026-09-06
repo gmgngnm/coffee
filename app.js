@@ -19,11 +19,11 @@
  *   8. 起動
  * ==================================================================== */
 
-const APP_VERSION = "2.5.0";
+const APP_VERSION = "2.5.1";
 
 /* ホームのロゴの下に #002 の形で出す、mainへマージした回数。
    マージのたびに1つ増やす（この見た目になるまでに何回積んだか） */
-const MERGE_COUNT = 18;
+const MERGE_COUNT = 19;
 
 /* ------------------------------------------------------------------ *
  * 1. 下ごしらえ
@@ -836,7 +836,9 @@ function monthTrend(list, midnight) {
   const pts = counts.map((c, i) => `${i} ${yOf(c).toFixed(2)}`);
   const line = "M" + pts.join(" L");
 
-  const spark = el("div", "spark");
+  /* 1杯も無いうちは、線を引いても「満ちている」ように見える。
+     そのときは目盛りの色まで沈めて、空だと分かるようにする */
+  const spark = el("div", total ? "spark" : "spark empty");
   spark.innerHTML =
     `<svg viewBox="0 0 ${TREND_DAYS - 1} ${SPARK_VB}" preserveAspectRatio="none" role="img"` +
     ` aria-label="Cups brewed per day over the last 30 days. ${total} in total,` +
