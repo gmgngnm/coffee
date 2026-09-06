@@ -19,11 +19,11 @@
  *   8. 起動
  * ==================================================================== */
 
-const APP_VERSION = "2.6.0";
+const APP_VERSION = "2.7.0";
 
 /* ホームのロゴの下に #002 の形で出す、mainへマージした回数。
    マージのたびに1つ増やす（この見た目になるまでに何回積んだか） */
-const MERGE_COUNT = 20;
+const MERGE_COUNT = 21;
 
 /* ------------------------------------------------------------------ *
  * 1. 下ごしらえ
@@ -225,6 +225,7 @@ const DEFAULT_SETTINGS = {
   wakelock: true,    // タイマー中は画面を消さない
   volume: 70,
   countdown: 3,      // 開始を押してから走り出すまでの秒数（0〜10）
+  drips: true,       // 背景に、注いだぶんの雫と液面を出すか
   theme: "auto",
   roast: "medium",   // アクセントの焙煎度
 };
@@ -703,7 +704,9 @@ function showScreen(name, { replace = false } = {}) {
     navStack.pop();
   }
 
-  window.scrollTo(0, 0);
+  /* 画面そのものは動かないので、戻すのは中身のスクロール位置 */
+  const area = $(id).querySelector(".scroll-area");
+  if (area) area.scrollTop = 0;
   if (!navSuppressHistory) history.pushState({ screen: name }, "");
 }
 
@@ -1100,6 +1103,8 @@ function drawBrewBackground(now) {
   const canvas = $("brew-bg");
   const w = canvas.clientWidth, h = canvas.clientHeight;
   if (!w || !h) return;
+  /* 設定で切ってあるときは、時刻だけ進めて何も描かない */
+  if (!settings.drips) { brew.at = now; return; }
   const dpr = Math.min(2, window.devicePixelRatio || 1);
   if (canvas.width !== Math.round(w * dpr)) {
     canvas.width = Math.round(w * dpr);
@@ -1335,22 +1340,31 @@ function drawBrewBackground(now) {
   }
 }
 
-/* いまいる手順のあいだだけを取り出した帯。始まりの時刻と、次の合図の
-   時刻を両端に置き、そのあいだのどこにいるかを点で示す。円が淹れ全体の
-   形を見せるのに対して、こちらは「次の合図まで」だけを言う */
-function renderLane(steps, total, elapsedSec, curIdx) {
-  const lane = $("timer-lane");
-  if (!steps.length || timer.state === "done") { lane.hidden = true; return; }
-  const i = Math.max(0, curIdx);
-  const from = curIdx < 0 ? 0 : steps[i].at;
+/* いまと次の手順を、手を動かすのに要る形だけで出す。
+   注ぐ手順なら「60 g を 45 秒」、それ以外なら「氷 を 10 秒」。
+   走り出す前と数え下げのあいだは、1つ目と2つ目を出しておく */
+function stripCell(steps, total, i, what, forSec) {
+  if (i < 0 || i >= steps.length) { what.textContent = "—"; forSec.textContent = ""; return; }
+  const st = steps[i];
   const to = i + 1 < steps.length ? steps[i + 1].at : total;
-  const span = Math.max(1, to - from);
-  const at = Math.min(1, Math.max(0, (elapsedSec - from) / span));
-  lane.hidden = false;
-  $("lane-from").textContent = fmtClock(from);
-  $("lane-to").textContent = fmtClock(to);
-  $("lane-fill").style.width = `${(at * 100).toFixed(2)}%`;
-  $("lane-dot").style.left = `${(at * 100).toFixed(2)}%`;
+  const span = Math.max(0, Math.round(to - st.at));
+  if (st.kind === "finish") {
+    what.textContent = "Fertig";
+    forSec.textContent = "";
+    return;
+  }
+  const g = pourAmount(steps, i);
+  what.textContent = g ? `${g} g` : (st.label || KIND_LABEL[st.kind] || "—");
+  forSec.textContent = span ? `${span} s` : "";
+}
+
+function renderStrip(steps, total, curIdx) {
+  const strip = $("timer-strip");
+  if (!steps.length || timer.state === "done") { strip.hidden = true; return; }
+  const now = Math.max(0, curIdx);
+  strip.hidden = false;
+  stripCell(steps, total, now, $("strip-now-what"), $("strip-now-for"));
+  stripCell(steps, total, now + 1, $("strip-next-what"), $("strip-next-for"));
 }
 
 /* ---------- タイマーの見た目 ---------- */
@@ -1405,7 +1419,8 @@ function renderTimerLive() {
     main.classList.add("waiting", "count");
     sub.textContent = "";
     note.textContent = "";
-    $("timer-lane").hidden = true;
+    if (timer.recipe) renderStrip(scaledSteps(), timerTotalSec(), -1);
+    else $("timer-strip").hidden = true;
     $("timer-elapsed").textContent = "0:00";
     return;
   }
@@ -1420,7 +1435,7 @@ function renderTimerLive() {
     main.classList.remove("with-unit", "count");
     sub.textContent = timer.laps.length ? `${timer.laps.length}` : "";
     note.textContent = "";
-    $("timer-lane").hidden = true;
+    $("timer-strip").hidden = true;
     $("timer-elapsed").textContent = "";
     brew.total = 0; brew.marks = [];
     return;
@@ -1477,7 +1492,7 @@ function renderTimerLive() {
     note.textContent = instruction ? (instruction.label || KIND_LABEL[instruction.kind] || "") : "";
   }
 
-  renderLane(steps, total, elapsedSec, idle ? -1 : curIdx);
+  renderStrip(steps, total, idle ? -1 : curIdx);
 
   /* 背景。注いだ量と、投ごとの目盛り */
   const goal = recipeWater();
@@ -2102,6 +2117,7 @@ function renderSettings() {
   $("s-precue").checked = settings.precue;
   $("s-vibe").checked = settings.vibe;
   $("s-wakelock").checked = settings.wakelock;
+  $("s-drips").checked = settings.drips;
   $("s-volume").value = String(settings.volume);
   $("s-volume-out").textContent = `${settings.volume}%`;
   $("s-countdown").value = String(settings.countdown);
@@ -2116,6 +2132,11 @@ function renderSettings() {
 bindSwitch("s-chime", "chime", () => { syncMuteIcon(); if (timer.state === "running") scheduleUpcomingSounds(); });
 bindSwitch("s-precue", "precue", () => { if (timer.state === "running") scheduleUpcomingSounds(); });
 bindSwitch("s-vibe", "vibe");
+bindSwitch("s-drips", "drips", () => {
+  /* 切ったら、残っている絵をその場で消す */
+  const c = $("brew-bg");
+  if (!settings.drips && c.width) c.getContext("2d").clearRect(0, 0, c.width, c.height);
+});
 bindSwitch("s-wakelock", "wakelock", () => {
   if (settings.wakelock && timer.state === "running") acquireWakeLock(); else releaseWakeLock();
 });

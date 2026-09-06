@@ -59,27 +59,33 @@
 /* display を指定した要素は hidden 属性より強くなってしまう。
    見えない板が画面を覆ってタップを飲み込む事故を、ここで止める */
 [hidden]{display:none !important;}
-html,body{margin:0;padding:0;min-height:100%;}
-html{overflow-y:scroll;scrollbar-gutter:stable;}
+/* 普通のアプリと同じように、画面そのものは動かさない。
+   伸び縮みするのは中身（.scroll-area）の側だけ */
+html,body{margin:0;padding:0;height:100%;overflow:hidden;}
 body{
   background:var(--bg); color:var(--ink);
   font-family:var(--font-ui);
   letter-spacing:.01em;
   -webkit-font-smoothing:antialiased;
-  overscroll-behavior-y:none;
+  overscroll-behavior:none;
 }
 h1,h2,h3{font-family:var(--font-ui);font-weight:400;letter-spacing:.02em;margin:0;text-wrap:balance;}
 .mono{font-family:var(--font-mono);font-variant-numeric:tabular-nums;}
 button{font-family:inherit;cursor:pointer;}
 input,select,textarea{font-family:inherit;}
 
-#app{max-width:480px;margin:0 auto;min-height:100vh;min-height:100dvh;background:var(--bg);position:relative;}
+#app{
+  max-width:480px;margin:0 auto;height:100%;height:100dvh;overflow:hidden;
+  background:var(--bg);position:relative;
+}
 
 /* ---------- 画面 ---------- */
-.screen{display:none;flex-direction:column;min-height:100vh;min-height:100dvh;}
+.screen{display:none;flex-direction:column;height:100%;overflow:hidden;}
 .screen.active{display:flex;}
 .scroll-area{
-  flex:1;padding:0 18px calc(30px + env(safe-area-inset-bottom));
+  flex:1;min-height:0;overflow-y:auto;overscroll-behavior:contain;
+  -webkit-overflow-scrolling:touch;
+  padding:0 18px calc(30px + env(safe-area-inset-bottom));
 }
 .screen-timer .scroll-area{padding-bottom:calc(28px + env(safe-area-inset-bottom));}
 
@@ -136,9 +142,12 @@ input,select,textarea{font-family:inherit;}
 }
 
 /* ---------- ホーム ---------- */
+/* あいさつは1行に収める。いちばん長い一文が入る大きさまで、画面幅に
+   合わせて縮める */
 .greeting{
-  font-family:var(--font-ui);font-size:17px;margin:16px auto 18px;color:var(--ink-soft);
-  letter-spacing:.02em;text-align:center;max-width:26ch;line-height:1.4;
+  font-family:var(--font-ui);font-size:min(15px, 4.3vw);margin:14px 0 16px;
+  color:var(--ink-soft);letter-spacing:.02em;text-align:center;
+  white-space:nowrap;overflow:hidden;text-overflow:ellipsis;line-height:1.4;
 }
 .stat-strip{display:flex;gap:8px;margin-bottom:18px;}
 .stat{
@@ -273,27 +282,30 @@ input,select,textarea{font-family:inherit;}
   flex:1;display:flex;flex-direction:column;align-items:center;justify-content:center;
   gap:26px;padding:0 18px;
 }
-/* ---------- いまの投の帯 ---------- *
- *  円は淹れ全体の形を見せる。ここは今この投のなかのどこにいるかだけを、
- *  始まりの時刻と次の合図の時刻を添えて出す
+/* ---------- いまと次の手順 ---------- *
+ *  円は淹れ全体の形を、下の時計は経過を見せる。ここは手を動かすのに
+ *  要る数字だけ ―― いま何gを何秒か、次は何gを何秒か
  * ------------------------------------------------------------------ */
-.lane{
-  display:flex;align-items:center;gap:10px;width:min(78vw,286px);
-  margin-bottom:-8px;
+.steps-strip{
+  display:flex;width:min(80vw,300px);margin-bottom:-6px;
+  border-radius:13px;overflow:hidden;
+  background:color-mix(in srgb, var(--accent) 6%, transparent);
 }
-.lane-time{font-size:11.5px;color:var(--ink-faint);letter-spacing:.02em;}
-.lane-track{
-  position:relative;flex:1;height:3px;border-radius:2px;
-  background:color-mix(in srgb, var(--accent) 16%, transparent);
+.strip-cell{
+  flex:1;display:flex;flex-direction:column;align-items:center;gap:1px;
+  padding:8px 6px 9px;
 }
-.lane-fill{
-  position:absolute;left:0;top:0;bottom:0;border-radius:2px;
-  background:var(--accent);width:0;
+.strip-cell.next{
+  border-left:1px solid color-mix(in srgb, var(--accent) 16%, transparent);
 }
-.lane-dot{
-  position:absolute;top:50%;width:7px;height:7px;border-radius:50%;
-  background:var(--accent);transform:translate(-50%,-50%);left:0;
+.strip-when{
+  font-size:9.5px;letter-spacing:.14em;text-transform:uppercase;
+  color:var(--ink-faint);font-family:var(--font-ui);
 }
+.strip-what{font-size:17px;color:var(--ink);line-height:1.25;}
+.strip-for{font-size:11.5px;color:var(--ink-faint);}
+.strip-cell.next .strip-what{color:var(--ink-soft);}
+
 .timer-foot{padding:0 18px calc(24px + env(safe-area-inset-bottom));flex-shrink:0;}
 
 .dial-wrap{position:relative;width:min(72vw,272px);aspect-ratio:1;}
