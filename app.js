@@ -19,11 +19,11 @@
  *   8. 起動
  * ==================================================================== */
 
-const APP_VERSION = "2.4.2";
+const APP_VERSION = "2.5.0";
 
 /* ホームのロゴの下に #002 の形で出す、mainへマージした回数。
    マージのたびに1つ増やす（この見た目になるまでに何回積んだか） */
-const MERGE_COUNT = 17;
+const MERGE_COUNT = 18;
 
 /* ------------------------------------------------------------------ *
  * 1. 下ごしらえ
@@ -684,9 +684,9 @@ const SCREEN_IDS = {
   "recipe-edit": "screen-recipe-edit",
   settings: "screen-settings",
 };
-const TAB_SCREENS = ["brew", "log", "recipes", "settings"];
-const FULL_SCREENS = ["timer"];      // タブバーを隠す画面
-let navStack = ["brew"];
+/* 出発点はいつもホーム。ほかの画面はそこから行って、戻ってくる */
+const ROOT_SCREEN = "brew";
+let navStack = [ROOT_SCREEN];
 let navSuppressHistory = false;
 
 function showScreen(name, { replace = false } = {}) {
@@ -695,14 +695,14 @@ function showScreen(name, { replace = false } = {}) {
   for (const key of Object.keys(SCREEN_IDS)) {
     $(SCREEN_IDS[key]).classList.toggle("active", key === name);
   }
-  if (TAB_SCREENS.includes(name)) navStack = [name];
+  if (name === ROOT_SCREEN) navStack = [name];
   else if (replace) navStack[navStack.length - 1] = name;
   else if (navStack[navStack.length - 1] !== name) navStack.push(name);
-
-  $("tabbar").classList.toggle("hidden", FULL_SCREENS.includes(name));
-  for (const tab of document.querySelectorAll(".tab")) {
-    tab.classList.toggle("active", tab.dataset.nav === name);
+  /* 同じ画面が2つ続くと、戻っても何も起きないように見える */
+  if (navStack.length > 1 && navStack[navStack.length - 1] === navStack[navStack.length - 2]) {
+    navStack.pop();
   }
+
   window.scrollTo(0, 0);
   if (!navSuppressHistory) history.pushState({ screen: name }, "");
 }
@@ -712,7 +712,7 @@ function goBack() {
     navStack.pop();
     showScreen(navStack[navStack.length - 1], { replace: true });
   } else {
-    showScreen("brew");
+    showScreen(ROOT_SCREEN);
   }
 }
 
@@ -1607,7 +1607,7 @@ function tasteRadar(taste) {
 
 let detailId = "";
 
-function openBrewDetail(id) {
+function openBrewDetail(id, { replace = false } = {}) {
   const b = findBrew(id);
   if (!b) return;
   detailId = id;
@@ -1663,7 +1663,7 @@ function openBrewDetail(id) {
     openBrewEditor(copy, { isNew: true });
   });
 
-  showScreen("brew-detail");
+  showScreen("brew-detail", { replace });
 }
 
 $("detail-edit").addEventListener("click", () => {
@@ -1817,7 +1817,8 @@ $("brew-save").addEventListener("click", async () => {
   toast(editingIsNew ? "Logged" : "Saved");
   renderHome();
   renderLog();
-  openBrewDetail(b.id);
+  /* 書き終えた記入欄は道に残さない。詳細から戻ると、元いた画面へ */
+  openBrewDetail(b.id, { replace: true });
 });
 
 $("brew-delete").addEventListener("click", async () => {

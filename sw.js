@@ -1,7 +1,7 @@
 /* 台所で使うアプリなので、電波が届かない場所でも開けるようにしておく。
    ただし更新に気づかないのは困るので、オンラインならネットワークを
    先に見て、落ちたときだけキャッシュを返す */
-const CACHE = "coffeerence-shell-v16";
+const CACHE = "coffeerence-shell-v17";
 const SHELL = [
   "./index.html",
   "./styles.css",
