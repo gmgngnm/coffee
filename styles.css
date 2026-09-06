@@ -20,7 +20,6 @@
   --danger:#C74B3F;
   --brand-blue:#2F6FED;
   --shadow: 0 1px 2px rgba(23,33,28,0.06), 0 8px 24px rgba(23,33,28,0.08);
-  --tab-h:60px;
 
   /* Optima（Hermann Zapf）。Apple製の端末には最初から入っているので、
      iPhone・iPad・Macでは本物が出る。無い端末のために、Windowsの
@@ -80,7 +79,7 @@ input,select,textarea{font-family:inherit;}
 .screen{display:none;flex-direction:column;min-height:100vh;min-height:100dvh;}
 .screen.active{display:flex;}
 .scroll-area{
-  flex:1;padding:0 18px calc(var(--tab-h) + 28px + env(safe-area-inset-bottom));
+  flex:1;padding:0 18px calc(30px + env(safe-area-inset-bottom));
 }
 .screen-timer .scroll-area{padding-bottom:calc(28px + env(safe-area-inset-bottom));}
 
@@ -136,7 +135,8 @@ input,select,textarea{font-family:inherit;}
 
 /* ---------- ホーム ---------- */
 .greeting{
-  font-family:var(--font-ui);font-size:21px;margin:2px 0 14px;color:var(--ink);letter-spacing:.02em;
+  font-family:var(--font-ui);font-size:21px;margin:2px auto 16px;color:var(--ink);
+  letter-spacing:.02em;text-align:center;max-width:20ch;line-height:1.35;
 }
 .stat-strip{display:flex;gap:8px;margin-bottom:18px;}
 .stat{
@@ -260,8 +260,10 @@ input,select,textarea{font-family:inherit;}
 .screen-timer .appbar{background:none;}
 
 .timer-title{
-  flex:1;text-align:center;font-family:var(--font-ui);font-size:20px;
-  overflow:hidden;text-overflow:ellipsis;white-space:nowrap;
+  /* ボタンが左に2つ並ぶので、そのぶん寄らないよう画面の中央に固定する */
+  position:absolute;left:50%;transform:translateX(-50%);max-width:58%;
+  text-align:center;font-family:var(--font-ui);font-size:20px;
+  overflow:hidden;text-overflow:ellipsis;white-space:nowrap;pointer-events:none;
 }
 .timer-body{
   flex:1;display:flex;flex-direction:column;align-items:center;justify-content:center;
@@ -383,27 +385,55 @@ input[type="range"]::-moz-range-thumb{
   flex:1;background:var(--surface);border:1px solid var(--line);border-radius:10px;
   padding:9px 11px;font-size:13px;color:var(--ink);outline:none;
 }
-.switch-row{
-  display:flex;align-items:center;justify-content:space-between;gap:14px;
-  background:var(--surface);border:1px solid var(--line);border-radius:12px;
-  padding:11px 14px;margin-bottom:8px;
+/* ---------- 設定 ---------- *
+ *  項目をひとつずつ箱に入れると、画面が箱だらけになって騒がしい。
+ *  近いものをひとまとめの箱に収め、中は細い線で分ける
+ * ------------------------------------------------------------------ */
+.settings-area .form-head{
+  font-size:11px;letter-spacing:.1em;text-transform:uppercase;
+  color:var(--ink-faint);margin:20px 0 7px;font-weight:400;
 }
-.switch-row span{display:flex;flex-direction:column;gap:2px;font-size:14px;}
-.switch-row small{font-size:11px;color:var(--ink-faint);font-weight:400;}
-.switch-row input[type="checkbox"]{
+.settings-area .form-head:first-child{margin-top:6px;}
+.set-group{
+  background:var(--surface);border:1px solid var(--line);border-radius:14px;overflow:hidden;
+}
+.set-row{
+  display:flex;align-items:center;justify-content:space-between;gap:14px;
+  width:100%;padding:12px 14px;background:none;border:none;
+  color:var(--ink);font-family:var(--font-ui);font-size:14px;text-align:left;
+}
+.set-row + .set-row{border-top:1px solid var(--line);}
+.set-row.stack{flex-direction:column;align-items:stretch;gap:9px;}
+.set-name{display:flex;flex-direction:column;gap:2px;font-size:14px;color:var(--ink);}
+.set-name small{font-size:11px;color:var(--ink-faint);font-weight:400;}
+.set-head{display:flex;align-items:baseline;justify-content:space-between;gap:10px;}
+.set-head label{font-size:13.5px;color:var(--ink);margin:0;}
+.set-side{display:flex;align-items:baseline;gap:10px;}
+.set-side .mono,.set-head .mono{font-family:var(--font-mono);font-size:12.5px;color:var(--accent);}
+.set-side .text-btn{padding:0;font-size:12px;}
+.set-note{font-size:11.5px;color:var(--ink-faint);line-height:1.75;margin:0;}
+.set-row.stack input[type="range"]{display:block;width:100%;margin:0 0 2px;}
+.set-row select{
+  background:var(--surface-2);border:1px solid var(--line);border-radius:9px;
+  padding:7px 10px;font-size:13.5px;color:var(--ink);outline:none;max-width:58%;
+}
+.set-row.act{color:var(--accent);}
+.set-row.act .set-name{color:var(--accent);}
+.set-row.act:active{background:var(--surface-2);}
+.set-row input[type="checkbox"]{
   -webkit-appearance:none;appearance:none;width:44px;height:26px;border-radius:999px;
   background:var(--line);position:relative;flex-shrink:0;transition:background .15s;margin:0;
 }
-.switch-row input[type="checkbox"]::after{
+.set-row input[type="checkbox"]::after{
   content:"";position:absolute;top:3px;left:3px;width:20px;height:20px;border-radius:50%;
   background:#fff;transition:transform .15s;box-shadow:0 1px 2px rgba(0,0,0,.25);
 }
-.switch-row input[type="checkbox"]:checked{background:var(--accent);}
-.switch-row input[type="checkbox"]:checked::after{transform:translateX(18px);}
+.set-row input[type="checkbox"]:checked{background:var(--accent);}
+.set-row input[type="checkbox"]:checked::after{transform:translateX(18px);}
 .btn-row{display:flex;gap:10px;}
 .btn-row .wide-btn{margin-top:0;}
 .hint{font-size:11.5px;color:var(--ink-faint);line-height:1.8;margin:10px 0;}
-.version-note{text-align:center;margin-top:26px;}
+.version-note{text-align:center;margin-top:20px;}
 
 /* ---------- 手順エディタ ---------- */
 .step-editor{display:flex;flex-direction:column;gap:8px;}
@@ -423,7 +453,7 @@ input[type="range"]::-moz-range-thumb{
 .w-water{width:78px;flex:none;}
 
 /* ---------- 焙煎度の見本 ---------- */
-.roast-row{display:flex;gap:10px;justify-content:space-between;margin-bottom:6px;}
+.roast-row{display:flex;gap:10px;justify-content:space-between;}
 .roast-swatch{
   flex:1;background:none;border:none;padding:0;display:flex;flex-direction:column;
   align-items:center;gap:6px;color:var(--ink-faint);
@@ -440,24 +470,10 @@ input[type="range"]::-moz-range-thumb{
 }
 .roast-name{font-size:10px;font-family:var(--font-ui);line-height:1.2;text-align:center;}
 
-/* ---------- タブバー ---------- */
-.tabbar{
-  position:fixed;left:50%;transform:translateX(-50%);bottom:0;width:100%;max-width:480px;
-  display:flex;background:var(--surface);border-top:1px solid var(--line);
-  padding-bottom:env(safe-area-inset-bottom);z-index:20;
-}
-.tab{
-  flex:1;background:none;border:none;padding:8px 0 7px;display:flex;flex-direction:column;
-  align-items:center;gap:3px;color:var(--ink-faint);font-size:10px;
-  font-family:var(--font-ui);
-}
-.tab.active{color:var(--accent);}
-.tabbar.hidden{display:none;}
-
 /* ---------- トースト・確認 ---------- */
 .toast{
   position:fixed;left:50%;transform:translateX(-50%);
-  bottom:calc(var(--tab-h) + 20px + env(safe-area-inset-bottom));
+  bottom:calc(24px + env(safe-area-inset-bottom));
   background:var(--accent);color:var(--bg);padding:11px 18px;border-radius:999px;
   font-size:12.5px;font-family:var(--font-mono);z-index:60;box-shadow:var(--shadow);max-width:86vw;text-align:center;
   animation:toastIn .18s ease-out;
