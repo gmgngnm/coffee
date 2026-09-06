@@ -19,11 +19,11 @@
  *   8. 起動
  * ==================================================================== */
 
-const APP_VERSION = "2.2.0";
+const APP_VERSION = "2.3.0";
 
 /* ホームのロゴの下に #002 の形で出す、mainへマージした回数。
    マージのたびに1つ増やす（この見た目になるまでに何回積んだか） */
-const MERGE_COUNT = 13;
+const MERGE_COUNT = 14;
 
 /* ------------------------------------------------------------------ *
  * 1. 下ごしらえ
@@ -895,6 +895,8 @@ const brew = {
   acc: 0,          // 雫1つぶんに満たない端数
   at: 0,
   drops: [],       // 落ちている雫
+  holdUntil: 0,    // ここまでは落ちてこない（蒸らし）
+  firstPour: true,
   ripples: [],     // 水面を伝わる波
   puffs: [],       // 湯気
   puffAt: 0,
@@ -902,9 +904,14 @@ const brew = {
   total: 0,        // 湯の合計量
 };
 const LEVEL_MAX = 0.92;        // 最後は画面の上のほうまで満ちる
-const DRIP_TAU = 11;           // 溜めた湯が落ちきるまでの目安（秒）
-const DROP_Q = 0.005;          // 雫1つが上げる高さ
+const DRIP_TAU = 13;           // 溜めた湯が落ちきるまでの目安（秒）。投の
+                               //   頭はよく落ち、次の投までにはほぼ止まる
+const DROP_Q = 0.0012;         // 雫1つが上げる高さ。雫の見た目の面積を
+                               //   画面幅で割った値にほぼ等しく、水面が
+                               //   雫の体積ぶんだけ上がるようにしてある
 const DROP_G = 1500;           // 雫の落下（px/s²）
+const DROP_MAX = 24;           // 同時に落ちる雫の数
+const BLOOM_HOLD = 4200;       // 1投目は粉が吸うぶん、落ち始めるまで間がある
 
 function splashPour() { /* 雫は溜まったぶんから自然に落ちる。合図は要らない */ }
 
@@ -912,6 +919,7 @@ function resetBrewBackground() {
   Object.assign(brew, {
     level: 0, target: 0, counted: 0, pending: 0, acc: 0, at: 0,
     drops: [], ripples: [], puffs: [], puffAt: 0,
+    holdUntil: 0, firstPour: true,
   });
 }
 
@@ -954,6 +962,8 @@ function drawBrewBackground(now) {
   if (brew.target > brew.counted) {
     brew.pending += brew.target - brew.counted;
     brew.counted = brew.target;
+    /* 1投目は粉が水を含むので、しばらく下へ落ちてこない */
+    if (brew.firstPour) { brew.holdUntil = now + BLOOM_HOLD; brew.firstPour = false; }
   }
   if (brew.target < brew.counted) {         // リセットされた
     brew.counted = brew.target;
@@ -961,22 +971,30 @@ function drawBrewBackground(now) {
   }
 
   /* 溜まりが多いほど速く落ちる。減るほど間が空き、やがて止まる。
-     淹れ終わったあとまでポタポタ続くのは間延びするので、そこは早める */
-  if (brew.pending > 0) {
-    const tau = timer.state === "done" ? 2 : DRIP_TAU;
-    brew.acc += Math.min(brew.pending, (brew.pending / tau) * dt);
-    while (brew.acc >= DROP_Q && brew.drops.length < 40 && brew.pending > 0) {
+     淹れ終わったあとまでポタポタ続くのは間延びするので、そこは注がず満たす */
+  if (timer.state === "done") {
+    if (brew.pending > 0) {
+      const q = Math.min(brew.pending, (brew.pending / 1.4 + 0.02) * dt);
+      brew.pending -= q;
+      brew.level += q;
+      if (brew.pending < 0.0008) { brew.level += brew.pending; brew.pending = 0; }
+    }
+  } else if (brew.pending > 0 && now >= brew.holdUntil) {
+    brew.acc += Math.min(brew.pending, (brew.pending / DRIP_TAU) * dt);
+    while (brew.acc >= DROP_Q && brew.drops.length < DROP_MAX && brew.pending > 0) {
       const q = Math.min(DROP_Q, brew.pending);
       brew.acc -= DROP_Q;
       brew.pending -= q;
       brew.drops.push({
         x: w * 0.5 + (Math.random() - 0.5) * 26,
-        y: -14 - Math.random() * 30,
+        y: -16 - Math.random() * 44,
         v: 40 + Math.random() * 60,
-        r: 3.4 + Math.random() * 1.6,
+        r: 5.6 + Math.random() * 2.6,
         q,
       });
     }
+    /* 数が頭打ちのあいだに溜め込んで、あとで束になって落ちないように */
+    brew.acc = Math.min(brew.acc, DROP_Q * 3);
     /* 最後のひとしずくが残り続けないよう、細くなったら畳む */
     if (brew.pending < DROP_Q * 0.4 && !brew.drops.length) {
       brew.level += brew.pending;
@@ -1031,14 +1049,14 @@ function drawBrewBackground(now) {
       continue;
     }
     /* 速いほど縦に伸びる。落下の筋も薄く引く */
-    const stretch = Math.min(3.2, 1 + d.v / 420);
-    ctx.strokeStyle = cssRgba(accent, 0.18);
-    ctx.lineWidth = d.r * 0.7;
+    const stretch = Math.min(2.6, 1 + d.v / 520);
+    ctx.strokeStyle = cssRgba(accent, 0.05);
+    ctx.lineWidth = d.r * 0.45;
     ctx.beginPath();
-    ctx.moveTo(d.x, d.y - d.r * stretch * 3.4);
+    ctx.moveTo(d.x, d.y - d.r * stretch * 2.2);
     ctx.lineTo(d.x, d.y);
     ctx.stroke();
-    ctx.fillStyle = cssRgba(accent, 0.5);
+    ctx.fillStyle = cssRgba(accent, 0.24);
     ctx.beginPath();
     ctx.ellipse(d.x, d.y, d.r, d.r * stretch, 0, 0, TAU);
     ctx.fill();
@@ -1047,35 +1065,55 @@ function drawBrewBackground(now) {
 
   /* --- 湯気 --- */
   /* 白く。背景と同じ白ではなく、少し明るい白で浮かせる */
-  if (brew.level > 0.02 && now - brew.puffAt > 150) {
+  if (brew.level > 0.006 && now - brew.puffAt > 230) {
     brew.puffAt = now;
-    const px = w * (0.28 + Math.random() * 0.44);
+    const px = w * (0.34 + Math.random() * 0.32);
     brew.puffs.push({
       x: px, y: yAt(px) - 4, born: now,
-      life: 3400 + Math.random() * 1800,
-      r: 16 + Math.random() * 14,
-      vy: 30 + Math.random() * 20,
-      drift: (Math.random() - 0.5) * 26,
+      life: 2600 + Math.random() * 1300,
+      r: 9 + Math.random() * 7,
+      vy: 46 + Math.random() * 26,
+      drift: (Math.random() - 0.5) * 30,
       seed: Math.random() * 10,
     });
   }
   brew.puffs = brew.puffs.filter((p) => now - p.born < p.life);
-  const steamPeak = isDarkNow() ? 0.17 : 0.5;
+  const steamPeak = isDarkNow() ? 0.34 : 0.9;
   for (const p of brew.puffs) {
     const age = (now - p.born) / p.life;
     const y = p.y - p.vy * ((now - p.born) / 1000) * (1 + age * 1.4);
     const x = p.x + Math.sin(age * 3.1 + p.seed) * 16 + p.drift * age;
-    const r = p.r * (1 + age * 2.4);
-    const a = steamPeak * Math.sin(Math.min(1, age * 1.15) * Math.PI) * Math.min(1, brew.level * 5);
+    /* 立ちのぼるにつれて縦に伸びる。丸いままだと湯気ではなく泡に見える */
+    const rx = p.r * (1 + age * 1.9);
+    const ry = rx * (1.5 + age * 0.9);
+    /* 湯気は湯が溜まる前から立つ。量で濃さが決まりきると、序盤が消える */
+    const a = steamPeak * Math.sin(Math.min(1, age * 1.12) * Math.PI)
+      * Math.min(1, 0.5 + brew.level * 4);
     if (a <= 0.004) continue;
     if (y > yAt(x) - 4) continue;          // 水中に湯気は立たない
-    const g2 = ctx.createRadialGradient(x, y, 0, x, y, r);
+    /* 白い湯気は白い背景では見えない。ごく淡い影を広めに敷いて、
+       白がその中に浮くようにする。輪郭は作らず、あくまで滲みで */
+    const halo = ctx.createRadialGradient(x, y, 0, x, y, rx * 1.7);
+    halo.addColorStop(0, cssRgba(accent, a * 0.1));
+    halo.addColorStop(0.6, cssRgba(accent, a * 0.05));
+    halo.addColorStop(1, cssRgba(accent, 0));
+    ctx.save();
+    ctx.translate(x, y);
+    ctx.scale(1, (ry * 1.7) / (rx * 1.7));
+    ctx.translate(-x, -y);
+    ctx.fillStyle = halo;
+    ctx.beginPath();
+    ctx.arc(x, y, rx * 1.7, 0, TAU);
+    ctx.fill();
+    ctx.restore();
+
+    const g2 = ctx.createRadialGradient(x, y, 0, x, y, rx);
     g2.addColorStop(0, `rgba(255,255,255,${a})`);
-    g2.addColorStop(0.55, `rgba(255,255,255,${a * 0.42})`);
+    g2.addColorStop(0.5, `rgba(255,255,255,${a * 0.62})`);
     g2.addColorStop(1, "rgba(255,255,255,0)");
     ctx.fillStyle = g2;
     ctx.beginPath();
-    ctx.arc(x, y, r, 0, TAU);
+    ctx.ellipse(x, y, rx, ry, 0, 0, TAU);
     ctx.fill();
   }
 
@@ -1158,7 +1196,7 @@ function renderTimerLive() {
     main.textContent = String(Math.ceil(left / 1000));
     main.lang = ""; sub.lang = "";
     main.classList.remove("with-unit");
-    main.classList.add("waiting");
+    main.classList.add("waiting", "count");
     sub.textContent = "";
     note.textContent = "";
     $("timer-elapsed").textContent = "0:00";
@@ -1172,7 +1210,7 @@ function renderTimerLive() {
     drawSectorDial([{ from: 0, to: 1, state: "now", fill: (elapsedSec % 60) / 60 }]);
     main.textContent = fmtClock(elapsedSec);
     main.lang = ""; sub.lang = "";
-    main.classList.remove("with-unit");
+    main.classList.remove("with-unit", "count");
     sub.textContent = timer.laps.length ? `${timer.laps.length}` : "";
     note.textContent = "";
     $("timer-elapsed").textContent = "";
@@ -1206,12 +1244,13 @@ function renderTimerLive() {
   if (timer.state === "done") {
     main.textContent = "Fertig";
     main.lang = "de";
-    main.classList.remove("with-unit", "waiting");
+    main.classList.remove("with-unit", "waiting", "count");
     sub.textContent = "Extraktion beendet";
     sub.lang = "de";
     note.textContent = "";
   } else {
     main.lang = ""; sub.lang = "";
+    main.classList.remove("count");
     if (amount) {
       main.innerHTML = `${amount}<span class="unit">g</span>`;
       main.classList.add("with-unit");

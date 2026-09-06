@@ -251,10 +251,12 @@ input,select,textarea{font-family:inherit;}
 }
 /* 数字にならない手順（混ぜる・押す）や、淹れ終わりのことば */
 .dial-main:not(.with-unit){font-size:34px;letter-spacing:.01em;font-family:var(--font-ui);}
+/* 開始前の数え下げ。離れていても読める大きさに */
+.dial-main.count{font-size:92px;font-family:var(--font-mono);letter-spacing:-3px;}
 .dial-sub{font-size:18px;color:var(--ink-faint);text-align:center;font-family:var(--font-mono);letter-spacing:.02em;}
 
 .elapsed{
-  font-size:38px;font-weight:300;letter-spacing:-1px;color:var(--ink-soft);line-height:1;
+  font-size:52px;font-weight:300;letter-spacing:-1px;color:var(--ink-soft);line-height:1;
 }
 /* 注ぐ以外の指示。行が増えても上がずれないよう、高さを先に取っておく */
 .timer-note{
