@@ -70,6 +70,12 @@
     </div>
 
     <div class="timer-body">
+      <!-- いまの投のぶんだけの時間の帯。始まりと、次の合図の時刻 -->
+      <div class="lane" id="timer-lane" hidden>
+        <span class="lane-time mono" id="lane-from">0:00</span>
+        <span class="lane-track"><span class="lane-fill" id="lane-fill"></span><span class="lane-dot" id="lane-dot"></span></span>
+        <span class="lane-time mono" id="lane-to">0:45</span>
+      </div>
       <div class="dial-wrap">
         <canvas class="dial" id="dial-canvas" aria-hidden="true"></canvas>
         <div class="dial-center">
