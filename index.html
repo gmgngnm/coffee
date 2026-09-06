@@ -70,11 +70,18 @@
     </div>
 
     <div class="timer-body">
-      <!-- いまの投のぶんだけの時間の帯。始まりと、次の合図の時刻 -->
-      <div class="lane" id="timer-lane" hidden>
-        <span class="lane-time mono" id="lane-from">0:00</span>
-        <span class="lane-track"><span class="lane-fill" id="lane-fill"></span><span class="lane-dot" id="lane-dot"></span></span>
-        <span class="lane-time mono" id="lane-to">0:45</span>
+      <!-- いま何gを何秒か、次は何gを何秒か。走り出す前から出しておく -->
+      <div class="steps-strip" id="timer-strip" hidden>
+        <div class="strip-cell">
+          <span class="strip-when">now</span>
+          <span class="strip-what mono" id="strip-now-what">60 g</span>
+          <span class="strip-for mono" id="strip-now-for">45 s</span>
+        </div>
+        <div class="strip-cell next">
+          <span class="strip-when">next</span>
+          <span class="strip-what mono" id="strip-next-what">60 g</span>
+          <span class="strip-for mono" id="strip-next-for">45 s</span>
+        </div>
       </div>
       <div class="dial-wrap">
         <canvas class="dial" id="dial-canvas" aria-hidden="true"></canvas>
@@ -382,6 +389,10 @@
         <label class="set-row">
           <span class="set-name"><strong>Keep awake</strong><small>Screen stays on while brewing</small></span>
           <input type="checkbox" id="s-wakelock" checked>
+        </label>
+        <label class="set-row">
+          <span class="set-name"><strong>Dripping</strong><small>Coffee drips and fills the screen behind the timer</small></span>
+          <input type="checkbox" id="s-drips" checked>
         </label>
       </div>
 
