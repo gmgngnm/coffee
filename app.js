@@ -19,11 +19,11 @@
  *   8. 起動
  * ==================================================================== */
 
-const APP_VERSION = "2.3.0";
+const APP_VERSION = "2.4.0";
 
 /* ホームのロゴの下に #002 の形で出す、mainへマージした回数。
    マージのたびに1つ増やす（この見た目になるまでに何回積んだか） */
-const MERGE_COUNT = 14;
+const MERGE_COUNT = 15;
 
 /* ------------------------------------------------------------------ *
  * 1. 下ごしらえ
@@ -725,7 +725,7 @@ function renderHome() {
     hour < 17 ? "Zeit für eine Pause." :
                 "Wie brühst du heute?";
 
-  renderStats($("home-stats"), liveBrews());
+  renderHomeStats($("home-stats"), liveBrews());
 
   const list = liveRecipes();
   const box = $("home-recipes");
@@ -772,6 +772,118 @@ function recipeCard(recipe, withEdit) {
   go.innerHTML = '<svg width="15" height="15" viewBox="0 0 24 24" fill="currentColor"><path d="M8 5v14l11-7z"/></svg>';
   card.appendChild(go);
   card.addEventListener("click", () => openTimer(recipe));
+  return card;
+}
+
+/* ---------- ホームの帯 ---------- *
+ *  左は今日の杯数。右は枠2つぶんを使って、ひと月ぶんの1日あたりの
+ *  杯数を折れ線で出す。線は1本きりなので凡例は要らない（何の線かは
+ *  カードの見出しが言っている）。点ごとに数を書くと読まれないので、
+ *  数字は見出しの合計ひとつだけにして、日ごとの数は指でなぞったとき
+ *  に出す。目盛りは0の一本だけ、細く、背景に沈めておく
+ * ------------------------------------------------------------------ */
+const TREND_DAYS = 30;
+const SPARK_H = 34;              // 折れ線の高さ（px）
+const SPARK_VB = 10;             // 折れ線のviewBoxの高さ
+const SPARK_PAD = 0.7;           // 上下の余白（viewBox単位）
+
+function renderHomeStats(box, list) {
+  box.innerHTML = "";
+  const midnight = new Date();
+  midnight.setHours(0, 0, 0, 0);
+
+  const today = list.filter((b) => b.brewedAt >= midnight.getTime()).length;
+  const left = el("div", "stat");
+  const n = el("div", "stat-num");
+  n.textContent = String(today);
+  n.appendChild(el("span", "small", today === 1 ? "cup" : "cups"));
+  left.appendChild(n);
+  left.appendChild(el("div", "stat-label", "brewed today"));
+  box.appendChild(left);
+
+  box.appendChild(monthTrend(list, midnight));
+}
+
+function monthTrend(list, midnight) {
+  const DAY = 86400000;
+  const counts = new Array(TREND_DAYS).fill(0);
+  const dayOf = (ms) => {
+    const d = new Date(ms);
+    d.setHours(0, 0, 0, 0);
+    /* 夏時間で1日が23時間や25時間になる国があるので、丸めて日数にする */
+    return Math.round((d.getTime() - midnight.getTime()) / DAY);
+  };
+  for (const b of list) {
+    const i = TREND_DAYS - 1 + dayOf(b.brewedAt);
+    if (i >= 0 && i < TREND_DAYS) counts[i]++;
+  }
+  const total = counts.reduce((a, c) => a + c, 0);
+  const peak = Math.max(1, ...counts);
+  const dateAt = (i) => new Date(midnight.getTime() - (TREND_DAYS - 1 - i) * DAY);
+
+  const card = el("div", "stat wide");
+  const head = el("div", "stat-head");
+  const n = el("div", "stat-num");
+  n.textContent = String(total);
+  n.appendChild(el("span", "small", total === 1 ? "cup" : "cups"));
+  head.appendChild(n);
+  const label = el("div", "stat-label", "last 30 days");
+  head.appendChild(label);
+  card.appendChild(head);
+
+  const yOf = (c) => SPARK_VB - SPARK_PAD - (c / peak) * (SPARK_VB - SPARK_PAD * 2);
+  const zero = yOf(0);
+  const pts = counts.map((c, i) => `${i} ${yOf(c).toFixed(2)}`);
+  const line = "M" + pts.join(" L");
+
+  const spark = el("div", "spark");
+  spark.innerHTML =
+    `<svg viewBox="0 0 ${TREND_DAYS - 1} ${SPARK_VB}" preserveAspectRatio="none" role="img"` +
+    ` aria-label="Cups brewed per day over the last 30 days. ${total} in total,` +
+    ` at most ${peak} in a day.">` +
+    `<path class="spark-area" d="${line} L${TREND_DAYS - 1} ${zero} L0 ${zero} Z"/>` +
+    `<line class="spark-zero" x1="0" y1="${zero}" x2="${TREND_DAYS - 1}" y2="${zero}"/>` +
+    `<path class="spark-line" d="${line}"/>` +
+    `</svg><span class="spark-dot"></span><span class="spark-cross" hidden></span>`;
+  const dot = spark.querySelector(".spark-dot");
+  const cross = spark.querySelector(".spark-cross");
+  const yPx = (i) => SPARK_H - yOf(counts[i]) * (SPARK_H / SPARK_VB);
+  const xPct = (i) => (i / (TREND_DAYS - 1)) * 100;
+  const place = (i) => {
+    dot.style.left = `calc(${xPct(i).toFixed(2)}% - 4px)`;
+    dot.style.bottom = `${yPx(i).toFixed(1)}px`;
+  };
+  place(TREND_DAYS - 1);
+  card.appendChild(spark);
+
+  /* なぞっているあいだ、その日の数を見出しの側に出す */
+  const at = (clientX) => {
+    const r = spark.getBoundingClientRect();
+    if (!r.width) return;
+    const t = Math.min(1, Math.max(0, (clientX - r.left) / r.width));
+    const i = Math.round(t * (TREND_DAYS - 1));
+    label.textContent = `${fmtDate(dateAt(i).getTime())} · ${plural(counts[i], "cup")}`;
+    label.classList.add("live");
+    place(i);
+    cross.hidden = false;
+    cross.style.left = `calc(${xPct(i).toFixed(2)}% - 0.5px)`;
+  };
+  const off = () => {
+    label.textContent = "last 30 days";
+    label.classList.remove("live");
+    place(TREND_DAYS - 1);
+    cross.hidden = true;
+  };
+  spark.addEventListener("pointerdown", (e) => {
+    spark.setPointerCapture(e.pointerId);
+    at(e.clientX);
+  });
+  spark.addEventListener("pointermove", (e) => {
+    if (e.pressure > 0 || e.pointerType === "mouse") at(e.clientX);
+  });
+  spark.addEventListener("pointerup", off);
+  spark.addEventListener("pointercancel", off);
+  spark.addEventListener("pointerleave", off);
   return card;
 }
 
@@ -906,11 +1018,11 @@ const brew = {
 const LEVEL_MAX = 0.92;        // 最後は画面の上のほうまで満ちる
 const DRIP_TAU = 13;           // 溜めた湯が落ちきるまでの目安（秒）。投の
                                //   頭はよく落ち、次の投までにはほぼ止まる
-const DROP_Q = 0.0012;         // 雫1つが上げる高さ。雫の見た目の面積を
-                               //   画面幅で割った値にほぼ等しく、水面が
-                               //   雫の体積ぶんだけ上がるようにしてある
+const DROP_Q = 0.0025;         // 雫1つが上げる高さ。1粒ぶんの上がり幅は
+                               //   2px ほどで、水面のうねりより小さい。
+                               //   ここを詰めすぎると数が増えて汚くなる
 const DROP_G = 1500;           // 雫の落下（px/s²）
-const DROP_MAX = 24;           // 同時に落ちる雫の数
+const DROP_MAX = 14;           // 同時に落ちる雫の数
 const BLOOM_HOLD = 4200;       // 1投目は粉が吸うぶん、落ち始めるまで間がある
 
 function splashPour() { /* 雫は溜まったぶんから自然に落ちる。合図は要らない */ }
@@ -938,6 +1050,31 @@ function surfaceAt(x, base, t, now) {
     y += Math.sin((d - front) / 22) * 7 * env;
   }
   return y;
+}
+
+/* 1粒の雫。下がふくらみ、上へ細く尾を引く本物の形をなぞる。
+   単色で塗ると染みになるので、下ほど濃い縦のグラデーションにし、
+   左上に小さな照りを置いて、水の玉らしく見せる */
+function drawDroplet(ctx, x, y, r, tail, accent) {
+  const top = y - r * tail;
+  ctx.beginPath();
+  ctx.moveTo(x, top);
+  ctx.bezierCurveTo(x - r * 0.26, top + r * tail * 0.5, x - r, y - r * 0.8, x - r, y);
+  ctx.arc(x, y, r, Math.PI, 0, true);          // ふくらんだ下半分
+  ctx.bezierCurveTo(x + r, y - r * 0.8, x + r * 0.26, top + r * tail * 0.5, x, top);
+  ctx.closePath();
+
+  const g = ctx.createLinearGradient(0, top, 0, y + r);
+  g.addColorStop(0, cssRgba(accent, 0.045));
+  g.addColorStop(0.5, cssRgba(accent, 0.15));
+  g.addColorStop(1, cssRgba(accent, 0.3));
+  ctx.fillStyle = g;
+  ctx.fill();
+
+  ctx.fillStyle = "rgba(255,255,255,0.6)";
+  ctx.beginPath();
+  ctx.ellipse(x - r * 0.33, y - r * 0.28, r * 0.19, r * 0.28, -0.5, 0, TAU);
+  ctx.fill();
 }
 
 function drawBrewBackground(now) {
@@ -986,10 +1123,11 @@ function drawBrewBackground(now) {
       brew.acc -= DROP_Q;
       brew.pending -= q;
       brew.drops.push({
-        x: w * 0.5 + (Math.random() - 0.5) * 26,
-        y: -16 - Math.random() * 44,
-        v: 40 + Math.random() * 60,
-        r: 5.6 + Math.random() * 2.6,
+        /* 注ぎ口は1点。ばらけさせると、垂れるというより降ってくる */
+        x: w * 0.5 + (Math.random() - 0.5) * 9,
+        y: -18 - Math.random() * 30,
+        v: 30 + Math.random() * 40,
+        r: 7.5 + Math.random() * 2,
         q,
       });
     }
@@ -1048,18 +1186,8 @@ function drawBrewBackground(now) {
       d.done = true;
       continue;
     }
-    /* 速いほど縦に伸びる。落下の筋も薄く引く */
-    const stretch = Math.min(2.6, 1 + d.v / 520);
-    ctx.strokeStyle = cssRgba(accent, 0.05);
-    ctx.lineWidth = d.r * 0.45;
-    ctx.beginPath();
-    ctx.moveTo(d.x, d.y - d.r * stretch * 2.2);
-    ctx.lineTo(d.x, d.y);
-    ctx.stroke();
-    ctx.fillStyle = cssRgba(accent, 0.24);
-    ctx.beginPath();
-    ctx.ellipse(d.x, d.y, d.r, d.r * stretch, 0, 0, TAU);
-    ctx.fill();
+    /* 速いほど尾が伸びる */
+    drawDroplet(ctx, d.x, d.y, d.r, Math.min(2.5, 1.15 + d.v / 900), accent);
   }
   brew.drops = brew.drops.filter((d) => !d.done);
 
