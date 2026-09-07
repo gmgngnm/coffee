@@ -38,7 +38,10 @@
 [hidden]{display:none !important;}
 /* 普通のアプリと同じように、画面そのものは動かさない。
    伸び縮みするのは中身（.scroll-area）の側だけ */
-html,body{margin:0;padding:0;height:100%;overflow:hidden;}
+/* --app-h は app.js が window.innerHeight から入れる。端末のバーの
+   出入りで見えている高さが変わっても、そのぶんだけを使うため。
+   dvh も 100% も、端末によっては見えている高さと一致しない */
+html,body{margin:0;padding:0;height:var(--app-h, 100%);overflow:hidden;}
 body{
   background:var(--bg); color:var(--ink);
   font-family:var(--font-ui);
@@ -52,7 +55,7 @@ button{font-family:inherit;cursor:pointer;}
 input,select,textarea{font-family:inherit;}
 
 #app{
-  max-width:480px;margin:0 auto;height:100%;height:100dvh;overflow:hidden;
+  max-width:480px;margin:0 auto;height:100dvh;height:var(--app-h, 100dvh);overflow:hidden;
   background:var(--bg);position:relative;
 }
 
@@ -240,7 +243,14 @@ input,select,textarea{font-family:inherit;}
  * ------------------------------------------------------------------ */
 .screen-timer{position:relative;overflow:hidden;}
 .brew-bg{
-  position:absolute;inset:0;width:100%;height:100%;
+  /* 器は画面そのもの。入れ物の高さがどう測られようと、見えている面
+     いっぱいに広がるよう、画面へ直に留める。ここを入れ物任せにすると、
+     高さの測り違いがそのまま画面の下の空きになる */
+  position:fixed;top:0;left:50%;transform:translateX(-50%);
+  width:100%;max-width:480px;
+  /* canvas は置き換え要素なので、top と bottom だけでは伸びない。
+     高さは見えている面のぶんを明示する */
+  height:100dvh;height:var(--app-h, 100dvh);
   z-index:0;pointer-events:none;
 }
 .screen-timer .appbar,
@@ -265,11 +275,15 @@ input,select,textarea{font-family:inherit;}
  *  1つぶん送ってカシャッと収まる
  * ------------------------------------------------------------------ */
 .steps-strip{
-  display:flex;align-items:center;width:min(84vw,318px);margin-bottom:-4px;
+  display:flex;align-items:flex-end;width:min(84vw,318px);margin-bottom:-4px;
 }
 .strip-cell{
   flex:1;min-width:0;display:flex;flex-direction:column;align-items:center;gap:1px;
   padding:7px 4px;
+}
+.strip-when{
+  font-size:9.5px;letter-spacing:.14em;text-transform:uppercase;
+  color:var(--ink-faint);font-family:var(--font-ui);margin-bottom:1px;
 }
 .strip-cell.lead{flex:1.35;}
 .strip-what{
@@ -519,5 +533,5 @@ input[type="range"]::-moz-range-thumb{
 .sheet-btns{display:flex;gap:10px;}
 
 @media (min-width:481px){
-  #app{border-left:1px solid var(--line);border-right:1px solid var(--line);min-height:100dvh;}
+  #app{border-left:1px solid var(--line);border-right:1px solid var(--line);}
 }

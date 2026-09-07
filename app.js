@@ -19,11 +19,11 @@
  *   8. 起動
  * ==================================================================== */
 
-const APP_VERSION = "2.8.1";
+const APP_VERSION = "2.8.2";
 
 /* ホームのロゴの下に #002 の形で出す、mainへマージした回数。
    マージのたびに1つ増やす（この見た目になるまでに何回積んだか） */
-const MERGE_COUNT = 23;
+const MERGE_COUNT = 24;
 
 /* ------------------------------------------------------------------ *
  * 1. 下ごしらえ
@@ -1001,6 +1001,7 @@ const brew = {
   counted: 0,      // そのうち、もう雫に割り当てたぶん
   pending: 0,      // ドリッパーに残っていて、これから落ちるぶん
   acc: 0,          // 雫1つぶんに満たない端数
+  nextQ: 0,        // 次の1粒がどれだけ育ってから落ちるか
   at: 0,
   drops: [],       // 落ちている雫
   splash: [],      // 着水で跳ねた粒
@@ -1023,6 +1024,7 @@ const DROP_Q = 0.0025;         // 雫1つが上げる高さ。1粒ぶんの上�
 const DROP_G = 1500;           // 雫の落下（px/s²）
 const DROP_VMAX = 780;         // 終端速度。空気の抵抗と釣り合って、
                                //   ほんとうの雫はこれ以上は速くならない
+const DROP_R = 8.4;            // 標準の量の雫の半径。量に応じて増減する
 const DROP_MAX = 14;           // 同時に落ちる雫の数
 const BLOOM_HOLD = 4200;       // 1投目は粉が吸うぶん、落ち始めるまで間がある
 const CALM_TAU = 2.4;          // 落ちてこなくなってから、水面が凪ぐまで
@@ -1031,7 +1033,7 @@ function splashPour() { /* 雫は溜まったぶんから自然に落ちる。�
 
 function resetBrewBackground() {
   Object.assign(brew, {
-    level: 0, target: 0, counted: 0, pending: 0, acc: 0, at: 0,
+    level: 0, target: 0, counted: 0, pending: 0, acc: 0, nextQ: 0, at: 0,
     drops: [], ripples: [], puffs: [], puffAt: 0, splash: [],
     holdUntil: 0, firstPour: true, stir: 0, w: 0,
   });
@@ -1140,16 +1142,23 @@ function drawBrewBackground(now) {
     }
   } else if (brew.pending > 0 && now >= brew.holdUntil) {
     brew.acc += Math.min(brew.pending, (brew.pending / DRIP_TAU) * dt);
-    while (brew.acc >= DROP_Q && brew.drops.length < DROP_MAX && brew.pending > 0) {
-      const q = Math.min(DROP_Q, brew.pending);
-      brew.acc -= DROP_Q;
+    while (brew.drops.length < DROP_MAX && brew.pending > 0) {
+      /* 次の1粒がどれだけ育つかを先に決める。小粒が多く、たまに大粒。
+         大きい粒はそのぶん溜まるのを待つので、落ちる間合いもばらつく */
+      if (!brew.nextQ) brew.nextQ = DROP_Q * (0.4 + Math.random() * Math.random() * 2.2);
+      if (brew.acc < brew.nextQ) break;
+      const q = Math.min(brew.nextQ, brew.pending);
+      brew.acc -= brew.nextQ;
       brew.pending -= q;
+      /* 見た目の面積が水量に比例するように、半径は平方根で */
+      const r = DROP_R * Math.sqrt(brew.nextQ / DROP_Q);
+      brew.nextQ = 0;
       brew.drops.push({
         /* 注ぎ口は1点。ばらけさせると、垂れるというより降ってくる */
         x: w * 0.5 + (Math.random() - 0.5) * 9,
-        y: -18 - Math.random() * 30,
+        y: -14 - r - Math.random() * 30,
         v: 30 + Math.random() * 40,
-        r: 7.5 + Math.random() * 2,
+        r,
         /* ちぎれた直後の雫は、平たくなったり細長くなったりを繰り返す */
         osc: Math.random() * TAU, oscA: 0.2 + Math.random() * 0.1,
         q,
@@ -1165,7 +1174,7 @@ function drawBrewBackground(now) {
       }
     }
     /* 数が頭打ちのあいだに溜め込んで、あとで束になって落ちないように */
-    brew.acc = Math.min(brew.acc, DROP_Q * 3);
+    brew.acc = Math.min(brew.acc, DROP_Q * 3.5);
     /* 最後のひとしずくが残り続けないよう、細くなったら畳む */
     if (brew.pending < DROP_Q * 0.4 && !brew.drops.length) {
       brew.level += brew.pending;
@@ -1188,8 +1197,9 @@ function drawBrewBackground(now) {
     ctx.beginPath();
     ctx.moveTo(0, yAt(0));
     for (let x = 0; x <= w; x += 4) ctx.lineTo(x, yAt(x));
-    ctx.lineTo(w, h);
-    ctx.lineTo(0, h);
+    /* 底は少し余分に。1pxの測り違いでも、継ぎ目が出ないように */
+    ctx.lineTo(w, h + 40);
+    ctx.lineTo(0, h + 40);
     ctx.closePath();
     ctx.fill();
 
@@ -1220,7 +1230,7 @@ function drawBrewBackground(now) {
       brew.ripples.push({ t0: now, x: d.x, power });
       brew.stir = Math.min(1, brew.stir + power * 0.7);
       /* 着水で跳ねる小さな粒。大きい雫ほどよく跳ねる */
-      const n = d.r > 4 ? 2 + ((Math.random() * 3) | 0) : 0;
+      const n = d.r > 7 ? 2 + ((Math.random() * 3) | 0) : (d.r > 4 ? 1 : 0);
       for (let k = 0; k < n; k++) {
         brew.splash.push({
           x: d.x + (Math.random() - 0.5) * d.r * 2.6, y: surface - 2,
@@ -2320,6 +2330,20 @@ $("s-restore-recipes").addEventListener("click", async () => {
 /* ------------------------------------------------------------------ *
  * 8. 起動
  * ------------------------------------------------------------------ */
+
+/* 見えている高さを測って、そのぶんだけを画面に使う。端末のバーが
+   出入りすると 100% も dvh も実際の見え方とずれることがあり、その
+   ずれが画面の下に「何もない帯」として残ってしまう */
+function fitViewport() {
+  const h = (window.visualViewport && window.visualViewport.height) || window.innerHeight;
+  if (h) document.documentElement.style.setProperty("--app-h", `${Math.round(h)}px`);
+}
+fitViewport();
+window.addEventListener("resize", fitViewport);
+window.addEventListener("orientationchange", () => setTimeout(fitViewport, 120));
+if (window.visualViewport) window.visualViewport.addEventListener("resize", fitViewport);
+document.addEventListener("visibilitychange", () => { if (!document.hidden) fitViewport(); });
+
 for (const btn of document.querySelectorAll("[data-nav]")) {
   btn.addEventListener("click", () => {
     const name = btn.dataset.nav;
