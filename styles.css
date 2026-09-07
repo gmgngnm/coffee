@@ -56,7 +56,10 @@ input,select,textarea{font-family:inherit;}
 
 #app{
   max-width:480px;margin:0 auto;height:100dvh;height:var(--app-h, 100dvh);overflow:hidden;
-  background:var(--bg);position:relative;
+  /* 下地は body に任せる。ここを塗ると、body に流したコーヒーの色が
+     隠れてしまう（コーヒーは画面の下まで確実に届かせたいので、
+     body の下地に塗っている。app.js の paintPageLiquid を見よ） */
+  position:relative;
 }
 
 /* ---------- 画面 ---------- */
