@@ -19,11 +19,11 @@
  *   8. 起動
  * ==================================================================== */
 
-const APP_VERSION = "2.8.5";
+const APP_VERSION = "2.8.6";
 
 /* ホームのロゴの下に #002 の形で出す、mainへマージした回数。
    マージのたびに1つ増やす（この見た目になるまでに何回積んだか） */
-const MERGE_COUNT = 27;
+const MERGE_COUNT = 28;
 
 /* ------------------------------------------------------------------ *
  * 1. 下ごしらえ
@@ -1034,6 +1034,8 @@ const BG_BLEED = 240;          // 背景を画面の下へはみ出させるぶ�
 const LIQ_DEEP = 170;          // 水面からここまでで、いちばん深い色になる。
                                //   浅いままで箱の底に届くと、そこから下の
                                //   受け持ちとのあいだに段が見える
+const LIQ_SPAN = 3000;         // 下地に流す図の丈。どの端末の画面よりも
+                               //   高く取っておけば、底で切れることがない
 
 function splashPour() { /* 雫は溜まったぶんから自然に落ちる。合図は要らない */ }
 
@@ -1109,7 +1111,7 @@ function paintPageLiquid(base) {
   if (base == null) {
     if (st.backgroundImage) {
       st.backgroundImage = ""; st.backgroundColor = "";
-      st.backgroundRepeat = ""; st.backgroundAttachment = "";
+      st.backgroundRepeat = ""; st.backgroundAttachment = ""; st.backgroundSize = "";
     }
     return;
   }
@@ -1123,9 +1125,11 @@ function paintPageLiquid(base) {
   const deep = Math.round(base + LIQ_DEEP);
   st.backgroundColor = c2;                 // 図の外（画面の下のほう）はここ
   st.backgroundRepeat = "no-repeat";
-  /* 目盛りの取り方を画面そのものにする。入れ物の高さがどう測られても、
-     100% が画面の底になり、色が途中で切り替わらない */
+  /* 目盛りの取り方を画面そのものにし、図の丈もどの端末より高く取る。
+     こうすると、入れ物の高さがどう測られようと、水面から下は
+     ひと続きの色で画面の底まで届く */
   st.backgroundAttachment = "fixed";
+  st.backgroundSize = `100% ${LIQ_SPAN}px`;
   st.backgroundImage =
     `linear-gradient(to bottom, ${page} 0px, ${page} ${top}px,` +
     ` ${c0} ${top}px, ${c1} ${Math.max(top + 1, mid)}px,` +
@@ -2390,12 +2394,10 @@ $("s-restore-recipes").addEventListener("click", async () => {
    出入りすると 100% も dvh も実際の見え方とずれることがあり、その
    ずれが画面の下に「何もない帯」として残ってしまう */
 function fitViewport() {
-  /* 測り方は端末しだいで食い違う。足りないと画面の下が空くので、
-     いちばん大きいものを採る（画面の外にはみ出すぶんは見えない） */
-  const h = Math.max(
-    window.innerHeight || 0,
-    document.documentElement.clientHeight || 0,
-  );
+  /* 中身は見えている高さぴったりに置く。ここを大きく取ると、下の
+     ボタンや一覧の続きが画面の外に出たまま、たどり着けなくなる。
+     画面より広く塗るのは背景だけの仕事（paintPageLiquid） */
+  const h = window.innerHeight || document.documentElement.clientHeight || 0;
   if (h) document.documentElement.style.setProperty("--app-h", `${Math.round(h)}px`);
 }
 fitViewport();
