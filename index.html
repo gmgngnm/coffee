@@ -71,19 +71,19 @@
     </div>
 
     <div class="timer-body">
-      <!-- 前・いま・次の手順。いまが真ん中で、回が移ると1つぶん送る -->
+      <!-- 真ん中が次の回。左はいまの回、右はその次。回が移ると1つ送る -->
       <div class="steps-strip" id="timer-strip" hidden>
-        <div class="strip-cell side">
-          <span class="strip-what mono" id="strip-prev-what">—</span>
-          <span class="strip-for mono" id="strip-prev-for"></span>
+        <div class="strip-cell">
+          <span class="strip-what mono" id="strip-l-what"></span>
+          <span class="strip-for mono" id="strip-l-for"></span>
         </div>
-        <div class="strip-cell now" id="strip-now">
-          <span class="strip-what mono" id="strip-now-what">60 g</span>
-          <span class="strip-for mono" id="strip-now-for">45 s</span>
+        <div class="strip-cell lead">
+          <span class="strip-what mono" id="strip-c-what">60 g</span>
+          <span class="strip-for mono" id="strip-c-for">45 s</span>
         </div>
-        <div class="strip-cell side">
-          <span class="strip-what mono" id="strip-next-what">60 g</span>
-          <span class="strip-for mono" id="strip-next-for">45 s</span>
+        <div class="strip-cell">
+          <span class="strip-what mono" id="strip-r-what"></span>
+          <span class="strip-for mono" id="strip-r-for"></span>
         </div>
       </div>
       <div class="dial-wrap">
