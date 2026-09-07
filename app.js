@@ -19,11 +19,11 @@
  *   8. 起動
  * ==================================================================== */
 
-const APP_VERSION = "2.10.1";
+const APP_VERSION = "2.10.2";
 
 /* ホームのロゴの下に #002 の形で出す、mainへマージした回数。
    マージのたびに1つ増やす（この見た目になるまでに何回積んだか） */
-const MERGE_COUNT = 33;
+const MERGE_COUNT = 34;
 
 /* ------------------------------------------------------------------ *
  * 1. 下ごしらえ
@@ -1390,11 +1390,12 @@ function renderStrip(steps, total, curIdx) {
   strip.hidden = false;
   if (curIdx === stripShown) return;
 
-  /* 真ん中は次の回。手を動かして備えるのはそこなので、いちばん大きい。
-     左はいま注いでいる回、右はその次。走り出す前は左が空になる */
-  stripCell(steps, total, curIdx, $("strip-l-what"), $("strip-l-for"));
-  stripCell(steps, total, curIdx + 1, $("strip-c-what"), $("strip-c-for"));
-  stripCell(steps, total, curIdx + 2, $("strip-r-what"), $("strip-r-for"));
+  /* 真ん中はいまの回。左は前の回、右は次の回。走り出す前は、1つ目を
+     真ん中に置いて左を空にする */
+  const i = Math.max(0, curIdx);
+  stripCell(steps, total, i - 1, $("strip-l-what"), $("strip-l-for"));
+  stripCell(steps, total, i, $("strip-c-what"), $("strip-c-for"));
+  stripCell(steps, total, i + 1, $("strip-r-what"), $("strip-r-for"));
 
   /* 回が移ったら、1つぶん送ってカシャッと収まる。開いた直後は動かさない */
   if (stripShown !== null && curIdx > stripShown) {
