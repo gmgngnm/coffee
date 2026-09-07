@@ -19,11 +19,11 @@
  *   8. 起動
  * ==================================================================== */
 
-const APP_VERSION = "2.9.1";
+const APP_VERSION = "2.9.2";
 
 /* ホームのロゴの下に #002 の形で出す、mainへマージした回数。
    マージのたびに1つ増やす（この見た目になるまでに何回積んだか） */
-const MERGE_COUNT = 30;
+const MERGE_COUNT = 31;
 
 /* ------------------------------------------------------------------ *
  * 1. 下ごしらえ
@@ -642,7 +642,6 @@ function startTimerLoop() {
   timer.rafId = requestAnimationFrame(loop);
 }
 function stopTimerLoop() {
-  paintPageLiquid(null);          // 下地のコーヒーを戻す
   timer.alive = false;
   if (timer.rafId) cancelAnimationFrame(timer.rafId);
   timer.rafId = 0;
@@ -1028,13 +1027,12 @@ const DROP_R = 8.4;            // 標準の量の雫の半径。量に応じて�
 const DROP_MAX = 14;           // 同時に落ちる雫の数
 const BLOOM_HOLD = 4200;       // 1投目は粉が吸うぶん、落ち始めるまで間がある
 const CALM_TAU = 2.4;          // 落ちてこなくなってから、水面が凪ぐまで
-const BG_BLEED = 240;          // 背景を画面の下へはみ出させるぶん（px）。
-                               //   styles.css の .brew-bg と同じ値
+const BG_BLEED = 300;          // 背景を画面の下へはみ出させるぶん（px）。
+                               //   styles.css の .brew-bg と同じ値。画面の
+                               //   高さの測り違いは、ここが吸う
 const LIQ_DEEP = 170;          // 水面からここまでで、いちばん深い色になる。
                                //   浅いままで箱の底に届くと、そこから下の
                                //   受け持ちとのあいだに段が見える
-const LIQ_SPAN = 3000;         // 下地に流す図の丈。どの端末の画面よりも
-                               //   高く取っておけば、底で切れることがない
 
 function splashPour() { /* 雫は溜まったぶんから自然に落ちる。合図は要らない */ }
 
@@ -1099,42 +1097,6 @@ function drawDroplet(ctx, x, y, rx, ry, tail, accent) {
   ctx.fill();
 }
 
-/* ページの下地に、水面から下のコーヒーを塗る。canvas と同じ色の並びを
-   使い、水面のうねりの下（base + 14）から始める。うねっている帯は
-   canvas 側が受け持つので、境目は重ならない。
-   ここを body に塗るのは、下地だけは入れ物の大きさに関係なく画面
-   ぜんぶに広がると決まっているから。canvas をどう伸ばしても届かない
-   端末があるので、最後の砦としてこちらを使う */
-function paintPageLiquid(base) {
-  const st = document.body.style;
-  if (base == null) {
-    if (st.backgroundImage) {
-      st.backgroundImage = ""; st.backgroundColor = "";
-      st.backgroundRepeat = ""; st.backgroundAttachment = ""; st.backgroundSize = "";
-    }
-    return;
-  }
-  const { accent, bg } = themeColors();
-  const c0 = cssRgb(mixRgb(bg, accent, 0.03));
-  const c1 = cssRgb(mixRgb(bg, accent, 0.13));
-  const c2 = cssRgb(mixRgb(bg, accent, 0.2));
-  const page = cssRgb(bg);
-  const top = Math.round(base + 14);
-  const mid = Math.round(base - 6 + (LIQ_DEEP + 6) * 0.35);
-  const deep = Math.round(base + LIQ_DEEP);
-  st.backgroundColor = c2;                 // 図の外（画面の下のほう）はここ
-  st.backgroundRepeat = "no-repeat";
-  /* 目盛りの取り方を画面そのものにし、図の丈もどの端末より高く取る。
-     こうすると、入れ物の高さがどう測られようと、水面から下は
-     ひと続きの色で画面の底まで届く */
-  st.backgroundAttachment = "fixed";
-  st.backgroundSize = `100% ${LIQ_SPAN}px`;
-  st.backgroundImage =
-    `linear-gradient(to bottom, ${page} 0px, ${page} ${top}px,` +
-    ` ${c0} ${top}px, ${c1} ${Math.max(top + 1, mid)}px,` +
-    ` ${c2} ${Math.max(top + 2, deep)}px, ${c2} 100%)`;
-}
-
 function drawBrewBackground(now) {
   const canvas = $("brew-bg");
   /* canvas は画面より BG_BLEED ぶん背が高い。絵の位置は「画面ぶん」の
@@ -1143,10 +1105,9 @@ function drawBrewBackground(now) {
   const w = canvas.clientWidth, hBox = canvas.clientHeight;
   if (!w || !hBox) return;
   const h = Math.max(1, hBox - BG_BLEED);
-  /* 設定で切ってあるとき、タイマー画面を離れたときは、下地も戻して何もしない */
+  /* 設定で切ってあるとき、タイマー画面を離れたときは何も描かない */
   if (!settings.drips || !$("screen-timer").classList.contains("active")) {
     brew.at = now;
-    paintPageLiquid(null);
     return;
   }
   const dpr = Math.min(2, window.devicePixelRatio || 1);
@@ -1238,15 +1199,9 @@ function drawBrewBackground(now) {
   brew.ripples = brew.ripples.filter((r) => now - r.t0 < 2600);
 
   /* --- 液 --- *
-   *  深いところは canvas では塗らない。canvas は端末によって画面の下まで
-   *  届かないことがあり、そこが白く残ってしまう。深いところはページの
-   *  下地（body）に塗る。下地は仕様上かならず画面ぜんぶを覆うので、
-   *  canvas がどこで切られても白は出ない。
-   *  canvas が受け持つのは、うねっている水面から FLAT_AT までの帯だけ。
-   *  同じ色の並びを使うので、継ぎ目は見えない
+   *  水面から板の底まで、ひと続きに塗る。板は画面より BG_BLEED ぶん
+   *  背が高く、器のどこにも overflow:hidden が無いので切られない
    * ------------------------------------------------------------------ */
-  const flatAt = base + 14;               // ここから下は下地の受け持ち
-  paintPageLiquid(brew.level > 0.001 ? base : null);
   if (brew.level > 0.001) {
     const grad = ctx.createLinearGradient(0, base - 6, 0, base + LIQ_DEEP);
     grad.addColorStop(0, cssRgba(accent, 0.03));
@@ -1256,8 +1211,8 @@ function drawBrewBackground(now) {
     ctx.beginPath();
     ctx.moveTo(0, yAt(0));
     for (let x = 0; x <= w; x += 4) ctx.lineTo(x, yAt(x));
-    ctx.lineTo(w, flatAt);
-    ctx.lineTo(0, flatAt);
+    ctx.lineTo(w, hBox + 10);
+    ctx.lineTo(0, hBox + 10);
     ctx.closePath();
     ctx.fill();
 
