@@ -19,11 +19,11 @@
  *   8. 起動
  * ==================================================================== */
 
-const APP_VERSION = "2.7.0";
+const APP_VERSION = "2.8.0";
 
 /* ホームのロゴの下に #002 の形で出す、mainへマージした回数。
    マージのたびに1つ増やす（この見た目になるまでに何回積んだか） */
-const MERGE_COUNT = 21;
+const MERGE_COUNT = 22;
 
 /* ------------------------------------------------------------------ *
  * 1. 下ごしらえ
@@ -209,12 +209,13 @@ const kvSet = (k, v) => idbPut("kv", { k, v });
    深くなる順に並べている。明るい面では白文字を載せるので濃いめの側を、
    暗い面では暗い文字を載せるので明るめの側を使う。どの段も、それぞれの
    面に対して4.5:1以上の明暗差がある */
+/* 焙煎の色。どれも明るい下地の上で 4.5:1 を超える濃さにしてある */
 const ROASTS = [
-  { id: "light",       name: "Light",       light: "#956026", dark: "#EAB77C" },
-  { id: "medium-light", name: "Medium-light", light: "#8A5324", dark: "#DFA666" },
-  { id: "medium",      name: "Medium",      light: "#7C4522", dark: "#D39455" },
-  { id: "medium-dark", name: "Medium-dark", light: "#65351E", dark: "#C7864B" },
-  { id: "dark",        name: "Dark",        light: "#4B2517", dark: "#BA7A45" },
+  { id: "light",        name: "Light",        hex: "#956026" },
+  { id: "medium-light", name: "Medium-light", hex: "#8A5324" },
+  { id: "medium",       name: "Medium",       hex: "#7C4522" },
+  { id: "medium-dark",  name: "Medium-dark",  hex: "#65351E" },
+  { id: "dark",         name: "Dark",         hex: "#4B2517" },
 ];
 const findRoast = (id) => ROASTS.find((r) => r.id === id) || ROASTS[2];
 
@@ -226,27 +227,16 @@ const DEFAULT_SETTINGS = {
   volume: 70,
   countdown: 3,      // 開始を押してから走り出すまでの秒数（0〜10）
   drips: true,       // 背景に、注いだぶんの雫と液面を出すか
-  theme: "auto",
   roast: "medium",   // アクセントの焙煎度
 };
 let settings = { ...DEFAULT_SETTINGS };
 
-/* いま実際に暗い面かどうか。設定が「端末に合わせる」のときだけ端末に訊く */
-function isDarkNow() {
-  if (settings.theme === "dark") return true;
-  if (settings.theme === "light") return false;
-  return matchMedia("(prefers-color-scheme: dark)").matches;
-}
-
+/* 見た目は明るい面ひとつ。変わるのは焙煎度で選ぶ差し色だけ */
 function applyTheme() {
-  const root = document.documentElement;
-  if (settings.theme === "auto") root.removeAttribute("data-theme");
-  else root.setAttribute("data-theme", settings.theme);
-  const dark = isDarkNow();
   const roast = findRoast(settings.roast);
-  root.style.setProperty("--accent", dark ? roast.dark : roast.light);
+  document.documentElement.style.setProperty("--accent", roast.hex);
   const meta = document.querySelector('meta[name="theme-color"]');
-  if (meta) meta.setAttribute("content", dark ? "#101711" : roast.light);
+  if (meta) meta.setAttribute("content", roast.hex);
 }
 
 async function saveSettings() {
@@ -551,6 +541,7 @@ document.addEventListener("visibilitychange", () => {
 });
 
 function openTimer(recipe) {
+  stripShown = null;
   stopTimerLoop();
   cancelScheduledSounds();
   releaseWakeLock();
@@ -1271,7 +1262,7 @@ function drawBrewBackground(now) {
     });
   }
   brew.puffs = brew.puffs.filter((p) => now - p.born < p.life);
-  const steamPeak = isDarkNow() ? 0.3 : 0.78;
+  const steamPeak = 0.78;
   for (const p of brew.puffs) {
     const age = (now - p.born) / p.life;
     const y = p.y - p.vy * ((now - p.born) / 1000) * (1 + age * 1.4);
@@ -1358,13 +1349,30 @@ function stripCell(steps, total, i, what, forSec) {
   forSec.textContent = span ? `${span} s` : "";
 }
 
+let stripShown = null;          // いま出している手順の番号
+
 function renderStrip(steps, total, curIdx) {
   const strip = $("timer-strip");
-  if (!steps.length || timer.state === "done") { strip.hidden = true; return; }
+  if (!steps.length || timer.state === "done") {
+    strip.hidden = true;
+    stripShown = null;
+    return;
+  }
   const now = Math.max(0, curIdx);
   strip.hidden = false;
+  if (now === stripShown) return;
+
+  stripCell(steps, total, now - 1, $("strip-prev-what"), $("strip-prev-for"));
   stripCell(steps, total, now, $("strip-now-what"), $("strip-now-for"));
   stripCell(steps, total, now + 1, $("strip-next-what"), $("strip-next-for"));
+
+  /* 回が移ったら、1つぶん送ってカシャッと収まる。開いた直後は動かさない */
+  if (stripShown !== null && now > stripShown) {
+    strip.classList.remove("shift");
+    void strip.offsetWidth;            // 巻き戻して、もう一度かける
+    strip.classList.add("shift");
+  }
+  stripShown = now;
 }
 
 /* ---------- タイマーの見た目 ---------- */
@@ -1468,8 +1476,8 @@ function renderTimerLive() {
     main.textContent = "Fertig";
     main.lang = "de";
     main.classList.remove("with-unit", "waiting", "count");
-    sub.textContent = "Extraktion beendet";
-    sub.lang = "de";
+    sub.textContent = "";
+    sub.lang = "";
     note.textContent = "";
   } else {
     main.lang = ""; sub.lang = "";
@@ -1516,11 +1524,44 @@ $("timer-toggle").addEventListener("click", () => {
   if (timer.state === "running") pauseTimer();
   else startTimer();
 });
-$("timer-finish").addEventListener("click", () => {
+/* 記録を書かなくても、最後まで淹れて Finish を押したなら1杯は淹れている。
+   豆やメモの無い、淹れ方だけの記録を残しておく。あとから書き足せる */
+$("timer-finish").addEventListener("click", async () => {
   stopTimerLoop();
+  await logFinishedBrew();
   showScreen("brew");
   renderHome();
+  renderLog();
 });
+
+async function logFinishedBrew() {
+  const b = emptyBrew();
+  b.brewedAt = timer.startedAt || Date.now();
+  b.timeSec = Math.round(timerElapsedMs() / 1000);
+  const r = timer.recipe;
+  if (r) {
+    b.recipeId = r.id;
+    b.recipeName = r.name;
+    b.method = r.method || "";
+    b.grind = r.grind || "";
+    b.doseG = recipeDose();
+    b.waterG = recipeWater();
+    b.tempC = r.tempC ?? null;
+    const stored = findRecipe(r.id);
+    if (stored) { stored.usedAt = Date.now(); await saveRecipe(stored); }
+  }
+  /* 同じ豆を続けて使うことが多いので、直近の記録から引き継ぐ */
+  const last = liveBrews()[0];
+  if (last) {
+    b.bean = last.bean;
+    b.roaster = last.roaster;
+    b.roast = last.roast;
+    b.grinder = last.grinder;
+    if (!b.method) b.method = last.method;
+  }
+  await saveBrew(b);
+  toast("Counted as one brew");
+}
 $("timer-reset").addEventListener("click", resetTimer);
 $("timer-close").addEventListener("click", () => {
   if (timer.state === "running") pauseTimer();
@@ -2122,7 +2163,6 @@ function renderSettings() {
   $("s-volume-out").textContent = `${settings.volume}%`;
   $("s-countdown").value = String(settings.countdown);
   $("s-countdown-out").textContent = settings.countdown ? `${settings.countdown} s` : "off";
-  $("s-theme").value = settings.theme;
   renderRoastPicker();
   $("app-version").textContent = `v${APP_VERSION}`;
   $("s-data-note").textContent =
@@ -2156,14 +2196,13 @@ $("s-test-chime").addEventListener("click", () => playSoundNow("step", 2));
 function renderRoastPicker() {
   const box = $("s-roast");
   if (!box) return;
-  const dark = isDarkNow();
   box.innerHTML = "";
   for (const roast of ROASTS) {
     const btn = el("button", `roast-swatch${roast.id === settings.roast ? " on" : ""}`);
     btn.type = "button";
     btn.setAttribute("aria-label", roast.name);
     const dot = el("span", "roast-dot");
-    dot.style.background = dark ? roast.dark : roast.light;
+    dot.style.background = roast.hex;
     btn.appendChild(dot);
     btn.appendChild(el("span", "roast-name", roast.name));
     btn.addEventListener("click", async () => {
@@ -2178,13 +2217,6 @@ function renderRoastPicker() {
   const note = $("s-roast-note");
   if (note) note.textContent = `${findRoast(settings.roast).name} right now. The darker the bean, the deeper the accent.`;
 }
-
-$("s-theme").addEventListener("change", async (e) => {
-  settings.theme = e.target.value;
-  applyTheme();
-  await saveSettings();
-  renderRoastPicker();
-});
 
 /* ---------- CSVで持ち出す ---------- *
  *  記録はこの端末の中にしかないので、持ち出す道を用意する。1杯が1行、
