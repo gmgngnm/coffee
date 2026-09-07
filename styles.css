@@ -71,9 +71,12 @@ input,select,textarea{font-family:inherit;}
 .screen{display:none;}
 .screen.active{display:block;}
 /* タイマーだけは画面いっぱい。円を真ん中に、ボタンをいちばん下に置く */
+/* 丈は app.js が実測した画面の高さ（--screen-h）。まだ測れていない
+   あいだだけ svh を使う */
 .screen-timer.active{
   display:flex;flex-direction:column;
   min-height:100vh;min-height:100svh;
+  min-height:var(--screen-h, 100svh);
 }
 .scroll-area{padding:0 18px calc(16px + env(safe-area-inset-bottom));}
 
@@ -252,13 +255,14 @@ input,select,textarea{font-family:inherit;}
  * ------------------------------------------------------------------ */
 .screen-timer{position:relative;}
 .brew-bg{
-  /* 液も雫も湯気も、この板1枚に描く。画面に留めたうえで下へ大きく
-     はみ出させてあるので、画面の高さがどう測られても底まで届く。
-     器のどこにも overflow:hidden が無いから、この板は切られない */
+  /* 液も雫も湯気も、この板1枚に描く。
+     丈に画面の単位（vh・svh・dvh）を使わない。どれも端末によって
+     実際の見え方とずれ、そのずれが画面の下の空きになる。かわりに
+     どんな端末の画面よりも高い、ただの1200pxにしておく。画面から
+     はみ出したぶんは見えないし、触れない。
+     絵をどこまで描くかは、app.js が「画面の底」を実測して決める */
   position:fixed;top:0;left:50%;transform:translateX(-50%);
-  width:100%;max-width:480px;
-  height:calc(100vh + 300px);
-  height:calc(100svh + 300px);
+  width:100%;max-width:480px;height:1200px;
   z-index:0;pointer-events:none;
 }
 .screen-timer .appbar,
