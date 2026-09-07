@@ -248,9 +248,12 @@ input,select,textarea{font-family:inherit;}
      高さの測り違いがそのまま画面の下の空きになる */
   position:fixed;top:0;left:50%;transform:translateX(-50%);
   width:100%;max-width:480px;
-  /* canvas は置き換え要素なので、top と bottom だけでは伸びない。
-     高さは見えている面のぶんを明示する */
-  height:100dvh;height:var(--app-h, 100dvh);
+  /* 高さの測り方は端末しだいで数十pxずれる。ずれたぶんが画面の下の
+     空きになるので、はじめから下へ大きくはみ出させておく。はみ出した
+     ぶんは画面の外なので見えないし、触れない（pointer-events:none）。
+     絵の位置は app.js 側で「はみ出しを除いた高さ」を使って決める */
+  height:calc(100dvh + 240px);
+  height:calc(var(--app-h, 100dvh) + 240px);
   z-index:0;pointer-events:none;
 }
 .screen-timer .appbar,
