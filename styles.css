@@ -153,8 +153,17 @@ input,select,textarea{font-family:inherit;}
  *  線は1本きり。何の線かはカードの見出しが言っているので、凡例の
  *  箱は置かない。数字も点ごとには書かず、合計ひとつだけ添える
  * ------------------------------------------------------------------ */
-.stat-strip.home .stat{text-align:left;padding:9px 11px 9px 12px;}
-.stat-strip.home .stat.wide{flex:2;display:flex;flex-direction:column;}
+.stat-strip.home .stat{
+  text-align:left;padding:9px 11px 9px 12px;
+  /* 折れ線のぶん背が高くなる右の枠に、左も合わせて伸びる。中身は
+     縦の真ん中に置いて、上下に間が空いたままにならないようにする */
+  display:flex;flex-direction:column;justify-content:center;
+}
+.stat-strip.home .stat.wide{flex:2;justify-content:flex-start;}
+/* 今日の杯数は、この画面でいちばん見たい数。枠いっぱいに大きく出す */
+.stat-strip.home .stat:not(.wide) .stat-num{font-size:38px;line-height:1;}
+.stat-strip.home .stat:not(.wide) .stat-num .small{font-size:14px;margin-left:5px;}
+.stat-strip.home .stat:not(.wide) .stat-label{font-size:11.5px;margin-top:7px;}
 .stat-head{display:flex;align-items:baseline;justify-content:space-between;gap:8px;}
 .stat-head .stat-label{margin-top:0;text-align:right;white-space:nowrap;}
 .stat-head .stat-label.live{color:var(--ink-soft);}

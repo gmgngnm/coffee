@@ -19,11 +19,11 @@
  *   8. 起動
  * ==================================================================== */
 
-const APP_VERSION = "2.10.0";
+const APP_VERSION = "2.10.1";
 
 /* ホームのロゴの下に #002 の形で出す、mainへマージした回数。
    マージのたびに1つ増やす（この見た目になるまでに何回積んだか） */
-const MERGE_COUNT = 32;
+const MERGE_COUNT = 33;
 
 /* ------------------------------------------------------------------ *
  * 1. 下ごしらえ
@@ -1000,7 +1000,6 @@ const brew = {
   counted: 0,      // そのうち、もう雫に割り当てたぶん
   pending: 0,      // ドリッパーに残っていて、これから落ちるぶん
   acc: 0,          // 雫1つぶんに満たない端数
-  nextQ: 0,        // 次の1粒がどれだけ育ってから落ちるか
   at: 0,
   drops: [],       // 落ちている雫
   splash: [],      // 着水で跳ねた粒
@@ -1018,14 +1017,15 @@ const brew = {
 const LEVEL_MAX = 0.92;        // 最後は画面の上のほうまで満ちる
 const DRIP_TAU = 13;           // 溜めた湯が落ちきるまでの目安（秒）。投の
                                //   頭はよく落ち、次の投までにはほぼ止まる
-const DROP_Q = 0.0025;         // 雫1つが上げる高さ。1粒ぶんの上がり幅は
-                               //   2px ほどで、水面のうねりより小さい。
-                               //   ここを詰めすぎると数が増えて汚くなる
+const DROP_Q = 0.00083;        // 雫1つが上げる高さ。小さくするほど、同じ
+                               //   湯量でも落ちる回数が増える。1粒ぶんの
+                               //   上がり幅は0.6pxほどで、水面のうねりより
+                               //   ずっと小さいので、跳ねては見えない
 const DROP_G = 1500;           // 雫の落下（px/s²）
 const DROP_VMAX = 780;         // 終端速度。空気の抵抗と釣り合って、
                                //   ほんとうの雫はこれ以上は速くならない
-const DROP_R = 8.4;            // 標準の量の雫の半径。量に応じて増減する
-const DROP_MAX = 14;           // 同時に落ちる雫の数
+const DROP_R = 6.8;            // 雫の半径。粒はどれも同じ大きさ
+const DROP_MAX = 40;           // 同時に落ちる雫の数
 const BLOOM_HOLD = 4200;       // 1投目は粉が吸うぶん、落ち始めるまで間がある
 const CALM_TAU = 2.4;          // 落ちてこなくなってから、水面が凪ぐまで
 const BG_BLEED = 320;          // 画面の底より下へ、これだけ余分に塗る。
@@ -1039,7 +1039,7 @@ function splashPour() { /* 雫は溜まったぶんから自然に落ちる。�
 
 function resetBrewBackground() {
   Object.assign(brew, {
-    level: 0, target: 0, counted: 0, pending: 0, acc: 0, nextQ: 0, at: 0,
+    level: 0, target: 0, counted: 0, pending: 0, acc: 0, at: 0,
     drops: [], ripples: [], puffs: [], puffAt: 0, splash: [],
     holdUntil: 0, firstPour: true, stir: 0, w: 0,
   });
@@ -1168,36 +1168,22 @@ function drawBrewBackground(now) {
     }
   } else if (brew.pending > 0 && now >= brew.holdUntil) {
     brew.acc += Math.min(brew.pending, (brew.pending / DRIP_TAU) * dt);
-    while (brew.drops.length < DROP_MAX && brew.pending > 0) {
-      /* 次の1粒がどれだけ育つかを先に決める。小粒が多く、たまに大粒。
-         大きい粒はそのぶん溜まるのを待つので、落ちる間合いもばらつく */
-      if (!brew.nextQ) brew.nextQ = DROP_Q * (0.4 + Math.random() * Math.random() * 2.2);
-      if (brew.acc < brew.nextQ) break;
-      const q = Math.min(brew.nextQ, brew.pending);
-      brew.acc -= brew.nextQ;
+    /* 粒はどれも同じ大きさ、同じ間合いで落ちる。溜まりが減るにつれて
+       間合いが空いていくのは、そのまま（pending が減るから） */
+    while (brew.acc >= DROP_Q && brew.drops.length < DROP_MAX && brew.pending > 0) {
+      const q = Math.min(DROP_Q, brew.pending);
+      brew.acc -= DROP_Q;
       brew.pending -= q;
-      /* 見た目の面積が水量に比例するように、半径は平方根で */
-      const r = DROP_R * Math.sqrt(brew.nextQ / DROP_Q);
-      brew.nextQ = 0;
       brew.drops.push({
         /* 注ぎ口は1点。ばらけさせると、垂れるというより降ってくる */
         x: w * 0.5 + (Math.random() - 0.5) * 9,
-        y: -14 - r - Math.random() * 30,
+        y: -14 - DROP_R - Math.random() * 26,
         v: 30 + Math.random() * 40,
-        r,
+        r: DROP_R,
         /* ちぎれた直後の雫は、平たくなったり細長くなったりを繰り返す */
         osc: Math.random() * TAU, oscA: 0.2 + Math.random() * 0.1,
         q,
       });
-      /* 大きい雫がちぎれると、糸の名残が小さな粒になって後を追う */
-      if (Math.random() < 0.45) {
-        const lead = brew.drops[brew.drops.length - 1];
-        brew.drops.push({
-          x: lead.x + (Math.random() - 0.5) * 3, y: lead.y - 18 - Math.random() * 14,
-          v: lead.v, r: lead.r * (0.28 + Math.random() * 0.12),
-          osc: Math.random() * TAU, oscA: 0.1, q: 0,
-        });
-      }
     }
     /* 数が頭打ちのあいだに溜め込んで、あとで束になって落ちないように */
     brew.acc = Math.min(brew.acc, DROP_Q * 3.5);
@@ -1257,8 +1243,8 @@ function drawBrewBackground(now) {
       const power = 0.35 + d.r / 14;
       brew.ripples.push({ t0: now, x: d.x, power });
       brew.stir = Math.min(1, brew.stir + power * 0.7);
-      /* 着水で跳ねる小さな粒。大きい雫ほどよく跳ねる */
-      const n = d.r > 7 ? 2 + ((Math.random() * 3) | 0) : (d.r > 4 ? 1 : 0);
+      /* 着水で跳ねる小さな粒。数が多いので、たまに跳ねるくらいで足りる */
+      const n = Math.random() < 0.3 ? 1 + ((Math.random() * 2) | 0) : 0;
       for (let k = 0; k < n; k++) {
         brew.splash.push({
           x: d.x + (Math.random() - 0.5) * d.r * 2.6, y: surface - 2,
