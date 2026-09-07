@@ -36,23 +36,25 @@
 /* display を指定した要素は hidden 属性より強くなってしまう。
    見えない板が画面を覆ってタップを飲み込む事故を、ここで止める */
 [hidden]{display:none !important;}
-/* 普通のアプリと同じように、画面そのものは動かさない。
-   伸び縮みするのは中身（.scroll-area）の側だけ */
-/* 中身の高さは「見えている高さ」ぴったりに。ここを大きく取ると、
-   はみ出したぶんが画面の外へ出たまま、たどり着けなくなる。
-   （画面より広く塗りたいのは背景だけ。そちらは body の下地が受け持つ。
-     app.js の paintPageLiquid を見よ） */
-html,body{
-  margin:0;padding:0;overflow:hidden;
-  height:100dvh;
-  height:var(--app-h, 100dvh);
+/* ---------- 画面の器 ---------- *
+ *  高さを測らない。測った値は端末によって数十pxずれ、そのずれが下の
+ *  空きや、届かない末尾になる。器の高さを決めず、中身なりに伸びる
+ *  ただの文書として流し、スクロールは文書そのものに任せる。
+ *  端で跳ねるのは overscroll-behavior で止める。
+ *  画面いっぱいに置きたいタイマーだけ、svh（バーが出ているときの高さ）
+ *  を下限にする。svh は見えている高さを超えないので、ボタンが隠れない
+ * ------------------------------------------------------------------ */
+html{height:auto;}
+body{
+  margin:0;padding:0;
+  min-height:100vh;min-height:100svh;
+  overscroll-behavior:none;
 }
 body{
   background:var(--bg); color:var(--ink);
   font-family:var(--font-ui);
   letter-spacing:.01em;
   -webkit-font-smoothing:antialiased;
-  overscroll-behavior:none;
 }
 h1,h2,h3{font-family:var(--font-ui);font-weight:400;letter-spacing:.02em;margin:0;text-wrap:balance;}
 .mono{font-family:var(--font-mono);font-variant-numeric:tabular-nums;}
@@ -60,9 +62,7 @@ button{font-family:inherit;cursor:pointer;}
 input,select,textarea{font-family:inherit;}
 
 #app{
-  max-width:480px;margin:0 auto;overflow:hidden;
-  height:100dvh;
-  height:var(--app-h, 100dvh);
+  max-width:480px;margin:0 auto;
   /* 下地は body に任せる。ここを塗ると、body に流したコーヒーの色が
      隠れてしまう（コーヒーは画面の下まで確実に届かせたいので、
      body の下地に塗っている。app.js の paintPageLiquid を見よ） */
@@ -70,13 +70,14 @@ input,select,textarea{font-family:inherit;}
 }
 
 /* ---------- 画面 ---------- */
-.screen{display:none;flex-direction:column;height:100%;overflow:hidden;}
-.screen.active{display:flex;}
-.scroll-area{
-  flex:1;min-height:0;overflow-y:auto;overscroll-behavior:contain;
-  -webkit-overflow-scrolling:touch;
-  padding:0 18px calc(12px + env(safe-area-inset-bottom));
+.screen{display:none;}
+.screen.active{display:block;}
+/* タイマーだけは画面いっぱい。円を真ん中に、ボタンをいちばん下に置く */
+.screen-timer.active{
+  display:flex;flex-direction:column;
+  min-height:100vh;min-height:100svh;
 }
+.scroll-area{padding:0 18px calc(16px + env(safe-area-inset-bottom));}
 
 /* ---------- アップバー ---------- */
 .appbar{
@@ -251,19 +252,15 @@ input,select,textarea{font-family:inherit;}
  *  円を画面の中心に置き、その下に経過だけを大きく出す。
  *  背景では、注ぐたびに液面が迫り上がる（app.js の drawBrewBackground）
  * ------------------------------------------------------------------ */
-.screen-timer{position:relative;overflow:hidden;}
+.screen-timer{position:relative;}
 .brew-bg{
-  /* 器は画面そのもの。入れ物の高さがどう測られようと、見えている面
-     いっぱいに広がるよう、画面へ直に留める。ここを入れ物任せにすると、
-     高さの測り違いがそのまま画面の下の空きになる */
+  /* 水面のうねりと雫を描く板。画面に留めて、下へ大きくはみ出させる。
+     深いところの色は body の下地が受け持つので、この板が画面の底まで
+     届かなくても白は出ない（app.js の paintPageLiquid を見よ） */
   position:fixed;top:0;left:50%;transform:translateX(-50%);
   width:100%;max-width:480px;
-  /* 高さの測り方は端末しだいで数十pxずれる。ずれたぶんが画面の下の
-     空きになるので、はじめから下へ大きくはみ出させておく。はみ出した
-     ぶんは画面の外なので見えないし、触れない（pointer-events:none）。
-     絵の位置は app.js 側で「はみ出しを除いた高さ」を使って決める */
-  height:calc(100dvh + 240px);
-  height:calc(var(--app-h, 100dvh) + 240px);
+  height:calc(100vh + 240px);
+  height:calc(100svh + 240px);
   z-index:0;pointer-events:none;
 }
 .screen-timer .appbar,
