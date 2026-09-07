@@ -19,11 +19,11 @@
  *   8. 起動
  * ==================================================================== */
 
-const APP_VERSION = "2.8.4";
+const APP_VERSION = "2.8.5";
 
 /* ホームのロゴの下に #002 の形で出す、mainへマージした回数。
    マージのたびに1つ増やす（この見た目になるまでに何回積んだか） */
-const MERGE_COUNT = 26;
+const MERGE_COUNT = 27;
 
 /* ------------------------------------------------------------------ *
  * 1. 下ごしらえ
@@ -1031,6 +1031,9 @@ const BLOOM_HOLD = 4200;       // 1投目は粉が吸うぶん、落ち始める
 const CALM_TAU = 2.4;          // 落ちてこなくなってから、水面が凪ぐまで
 const BG_BLEED = 240;          // 背景を画面の下へはみ出させるぶん（px）。
                                //   styles.css の .brew-bg と同じ値
+const LIQ_DEEP = 170;          // 水面からここまでで、いちばん深い色になる。
+                               //   浅いままで箱の底に届くと、そこから下の
+                               //   受け持ちとのあいだに段が見える
 
 function splashPour() { /* 雫は溜まったぶんから自然に落ちる。合図は要らない */ }
 
@@ -1104,7 +1107,10 @@ function drawDroplet(ctx, x, y, rx, ry, tail, accent) {
 function paintPageLiquid(base) {
   const st = document.body.style;
   if (base == null) {
-    if (st.backgroundImage) { st.backgroundImage = ""; st.backgroundColor = ""; st.backgroundRepeat = ""; }
+    if (st.backgroundImage) {
+      st.backgroundImage = ""; st.backgroundColor = "";
+      st.backgroundRepeat = ""; st.backgroundAttachment = "";
+    }
     return;
   }
   const { accent, bg } = themeColors();
@@ -1113,10 +1119,13 @@ function paintPageLiquid(base) {
   const c2 = cssRgb(mixRgb(bg, accent, 0.2));
   const page = cssRgb(bg);
   const top = Math.round(base + 14);
-  const mid = Math.round(base - 6 + 326 * 0.35);
-  const deep = Math.round(base + 320);
+  const mid = Math.round(base - 6 + (LIQ_DEEP + 6) * 0.35);
+  const deep = Math.round(base + LIQ_DEEP);
   st.backgroundColor = c2;                 // 図の外（画面の下のほう）はここ
   st.backgroundRepeat = "no-repeat";
+  /* 目盛りの取り方を画面そのものにする。入れ物の高さがどう測られても、
+     100% が画面の底になり、色が途中で切り替わらない */
+  st.backgroundAttachment = "fixed";
   st.backgroundImage =
     `linear-gradient(to bottom, ${page} 0px, ${page} ${top}px,` +
     ` ${c0} ${top}px, ${c1} ${Math.max(top + 1, mid)}px,` +
@@ -1236,7 +1245,7 @@ function drawBrewBackground(now) {
   const flatAt = base + 14;               // ここから下は下地の受け持ち
   paintPageLiquid(brew.level > 0.001 ? base : null);
   if (brew.level > 0.001) {
-    const grad = ctx.createLinearGradient(0, base - 6, 0, base + 320);
+    const grad = ctx.createLinearGradient(0, base - 6, 0, base + LIQ_DEEP);
     grad.addColorStop(0, cssRgba(accent, 0.03));
     grad.addColorStop(0.35, cssRgba(accent, 0.13));
     grad.addColorStop(1, cssRgba(accent, 0.2));
