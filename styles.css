@@ -63,9 +63,7 @@ input,select,textarea{font-family:inherit;}
 
 #app{
   max-width:480px;margin:0 auto;
-  /* 下地は body に任せる。ここを塗ると、body に流したコーヒーの色が
-     隠れてしまう（コーヒーは画面の下まで確実に届かせたいので、
-     body の下地に塗っている。app.js の paintPageLiquid を見よ） */
+  /* 下地は body に任せる。ここを塗ると、背面の板に描いた液が隠れる */
   position:relative;
 }
 
@@ -254,13 +252,13 @@ input,select,textarea{font-family:inherit;}
  * ------------------------------------------------------------------ */
 .screen-timer{position:relative;}
 .brew-bg{
-  /* 水面のうねりと雫を描く板。画面に留めて、下へ大きくはみ出させる。
-     深いところの色は body の下地が受け持つので、この板が画面の底まで
-     届かなくても白は出ない（app.js の paintPageLiquid を見よ） */
+  /* 液も雫も湯気も、この板1枚に描く。画面に留めたうえで下へ大きく
+     はみ出させてあるので、画面の高さがどう測られても底まで届く。
+     器のどこにも overflow:hidden が無いから、この板は切られない */
   position:fixed;top:0;left:50%;transform:translateX(-50%);
   width:100%;max-width:480px;
-  height:calc(100vh + 240px);
-  height:calc(100svh + 240px);
+  height:calc(100vh + 300px);
+  height:calc(100svh + 300px);
   z-index:0;pointer-events:none;
 }
 .screen-timer .appbar,
