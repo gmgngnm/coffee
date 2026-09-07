@@ -19,11 +19,11 @@
  *   8. 起動
  * ==================================================================== */
 
-const APP_VERSION = "2.8.0";
+const APP_VERSION = "2.8.1";
 
 /* ホームのロゴの下に #002 の形で出す、mainへマージした回数。
    マージのたびに1つ増やす（この見た目になるまでに何回積んだか） */
-const MERGE_COUNT = 22;
+const MERGE_COUNT = 23;
 
 /* ------------------------------------------------------------------ *
  * 1. 下ごしらえ
@@ -1097,9 +1097,13 @@ function drawBrewBackground(now) {
   /* 設定で切ってあるときは、時刻だけ進めて何も描かない */
   if (!settings.drips) { brew.at = now; return; }
   const dpr = Math.min(2, window.devicePixelRatio || 1);
-  if (canvas.width !== Math.round(w * dpr)) {
-    canvas.width = Math.round(w * dpr);
-    canvas.height = Math.round(h * dpr);
+  /* 高さも見ること。端末のバーが出入りすると幅は変わらず高さだけ変わる。
+     そこで作り直しそこねると、描いた絵が縦に潰れて、画面の下に何も
+     ないひと帯が残る */
+  const pw = Math.round(w * dpr), ph = Math.round(h * dpr);
+  if (canvas.width !== pw || canvas.height !== ph) {
+    canvas.width = pw;
+    canvas.height = ph;
   }
   const ctx = canvas.getContext("2d");
   ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
@@ -1335,7 +1339,8 @@ function drawBrewBackground(now) {
    注ぐ手順なら「60 g を 45 秒」、それ以外なら「氷 を 10 秒」。
    走り出す前と数え下げのあいだは、1つ目と2つ目を出しておく */
 function stripCell(steps, total, i, what, forSec) {
-  if (i < 0 || i >= steps.length) { what.textContent = "—"; forSec.textContent = ""; return; }
+  /* 無いものは空のまま。記号を置くと、そこに何かあるように見える */
+  if (i < 0 || i >= steps.length) { what.textContent = ""; forSec.textContent = ""; return; }
   const st = steps[i];
   const to = i + 1 < steps.length ? steps[i + 1].at : total;
   const span = Math.max(0, Math.round(to - st.at));
@@ -1358,21 +1363,22 @@ function renderStrip(steps, total, curIdx) {
     stripShown = null;
     return;
   }
-  const now = Math.max(0, curIdx);
   strip.hidden = false;
-  if (now === stripShown) return;
+  if (curIdx === stripShown) return;
 
-  stripCell(steps, total, now - 1, $("strip-prev-what"), $("strip-prev-for"));
-  stripCell(steps, total, now, $("strip-now-what"), $("strip-now-for"));
-  stripCell(steps, total, now + 1, $("strip-next-what"), $("strip-next-for"));
+  /* 真ん中は次の回。手を動かして備えるのはそこなので、いちばん大きい。
+     左はいま注いでいる回、右はその次。走り出す前は左が空になる */
+  stripCell(steps, total, curIdx, $("strip-l-what"), $("strip-l-for"));
+  stripCell(steps, total, curIdx + 1, $("strip-c-what"), $("strip-c-for"));
+  stripCell(steps, total, curIdx + 2, $("strip-r-what"), $("strip-r-for"));
 
   /* 回が移ったら、1つぶん送ってカシャッと収まる。開いた直後は動かさない */
-  if (stripShown !== null && now > stripShown) {
+  if (stripShown !== null && curIdx > stripShown) {
     strip.classList.remove("shift");
     void strip.offsetWidth;            // 巻き戻して、もう一度かける
     strip.classList.add("shift");
   }
-  stripShown = now;
+  stripShown = curIdx;
 }
 
 /* ---------- タイマーの見た目 ---------- */
