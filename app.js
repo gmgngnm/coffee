@@ -19,11 +19,11 @@
  *   8. 起動
  * ==================================================================== */
 
-const APP_VERSION = "2.8.6";
+const APP_VERSION = "2.9.0";
 
 /* ホームのロゴの下に #002 の形で出す、mainへマージした回数。
    マージのたびに1つ増やす（この見た目になるまでに何回積んだか） */
-const MERGE_COUNT = 28;
+const MERGE_COUNT = 29;
 
 /* ------------------------------------------------------------------ *
  * 1. 下ごしらえ
@@ -696,9 +696,8 @@ function showScreen(name, { replace = false } = {}) {
     navStack.pop();
   }
 
-  /* 画面そのものは動かないので、戻すのは中身のスクロール位置 */
-  const area = $(id).querySelector(".scroll-area");
-  if (area) area.scrollTop = 0;
+  /* 文書そのものが動くので、戻すのは窓のスクロール位置 */
+  window.scrollTo(0, 0);
   if (!navSuppressHistory) history.pushState({ screen: name }, "");
 }
 
@@ -2390,21 +2389,6 @@ $("s-restore-recipes").addEventListener("click", async () => {
  * 8. 起動
  * ------------------------------------------------------------------ */
 
-/* 見えている高さを測って、そのぶんだけを画面に使う。端末のバーが
-   出入りすると 100% も dvh も実際の見え方とずれることがあり、その
-   ずれが画面の下に「何もない帯」として残ってしまう */
-function fitViewport() {
-  /* 中身は見えている高さぴったりに置く。ここを大きく取ると、下の
-     ボタンや一覧の続きが画面の外に出たまま、たどり着けなくなる。
-     画面より広く塗るのは背景だけの仕事（paintPageLiquid） */
-  const h = window.innerHeight || document.documentElement.clientHeight || 0;
-  if (h) document.documentElement.style.setProperty("--app-h", `${Math.round(h)}px`);
-}
-fitViewport();
-window.addEventListener("resize", fitViewport);
-window.addEventListener("orientationchange", () => setTimeout(fitViewport, 120));
-if (window.visualViewport) window.visualViewport.addEventListener("resize", fitViewport);
-document.addEventListener("visibilitychange", () => { if (!document.hidden) fitViewport(); });
 
 for (const btn of document.querySelectorAll("[data-nav]")) {
   btn.addEventListener("click", () => {
