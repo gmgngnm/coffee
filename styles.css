@@ -38,15 +38,14 @@
 [hidden]{display:none !important;}
 /* 普通のアプリと同じように、画面そのものは動かさない。
    伸び縮みするのは中身（.scroll-area）の側だけ */
-/* 画面の高さの測り方は端末しだいで食い違う。ホーム画面に置いた Safari
-   では innerHeight が状態バーのぶんだけ短く出ることがあり、そのぶん
-   箱の底が画面より上に来て、そこから下が別の色に見えてしまっていた。
-   いちばん大きい値を採る。足りないより余るほうが害が小さい
-   （はみ出したぶんは overflow:hidden で見えないだけ） */
+/* 中身の高さは「見えている高さ」ぴったりに。ここを大きく取ると、
+   はみ出したぶんが画面の外へ出たまま、たどり着けなくなる。
+   （画面より広く塗りたいのは背景だけ。そちらは body の下地が受け持つ。
+     app.js の paintPageLiquid を見よ） */
 html,body{
   margin:0;padding:0;overflow:hidden;
   height:100dvh;
-  height:max(100dvh, var(--app-h, 0px));
+  height:var(--app-h, 100dvh);
 }
 body{
   background:var(--bg); color:var(--ink);
@@ -63,7 +62,7 @@ input,select,textarea{font-family:inherit;}
 #app{
   max-width:480px;margin:0 auto;overflow:hidden;
   height:100dvh;
-  height:max(100dvh, var(--app-h, 0px));
+  height:var(--app-h, 100dvh);
   /* 下地は body に任せる。ここを塗ると、body に流したコーヒーの色が
      隠れてしまう（コーヒーは画面の下まで確実に届かせたいので、
      body の下地に塗っている。app.js の paintPageLiquid を見よ） */
@@ -264,7 +263,7 @@ input,select,textarea{font-family:inherit;}
      ぶんは画面の外なので見えないし、触れない（pointer-events:none）。
      絵の位置は app.js 側で「はみ出しを除いた高さ」を使って決める */
   height:calc(100dvh + 240px);
-  height:calc(max(100dvh, var(--app-h, 0px)) + 240px);
+  height:calc(var(--app-h, 100dvh) + 240px);
   z-index:0;pointer-events:none;
 }
 .screen-timer .appbar,
