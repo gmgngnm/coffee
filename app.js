@@ -19,11 +19,11 @@
  *   8. 起動
  * ==================================================================== */
 
-const APP_VERSION = "2.8.2";
+const APP_VERSION = "2.8.3";
 
 /* ホームのロゴの下に #002 の形で出す、mainへマージした回数。
    マージのたびに1つ増やす（この見た目になるまでに何回積んだか） */
-const MERGE_COUNT = 24;
+const MERGE_COUNT = 25;
 
 /* ------------------------------------------------------------------ *
  * 1. 下ごしらえ
@@ -1028,6 +1028,8 @@ const DROP_R = 8.4;            // 標準の量の雫の半径。量に応じて�
 const DROP_MAX = 14;           // 同時に落ちる雫の数
 const BLOOM_HOLD = 4200;       // 1投目は粉が吸うぶん、落ち始めるまで間がある
 const CALM_TAU = 2.4;          // 落ちてこなくなってから、水面が凪ぐまで
+const BG_BLEED = 240;          // 背景を画面の下へはみ出させるぶん（px）。
+                               //   styles.css の .brew-bg と同じ値
 
 function splashPour() { /* 雫は溜まったぶんから自然に落ちる。合図は要らない */ }
 
@@ -1094,22 +1096,25 @@ function drawDroplet(ctx, x, y, rx, ry, tail, accent) {
 
 function drawBrewBackground(now) {
   const canvas = $("brew-bg");
-  const w = canvas.clientWidth, h = canvas.clientHeight;
-  if (!w || !h) return;
+  /* canvas は画面より BG_BLEED ぶん背が高い。絵の位置は「画面ぶん」の
+     h で決め、液だけを箱の底まで塗る。高さの測り方が多少ずれても、
+     画面の下に何もない帯が出ないようにするため */
+  const w = canvas.clientWidth, hBox = canvas.clientHeight;
+  if (!w || !hBox) return;
+  const h = Math.max(1, hBox - BG_BLEED);
   /* 設定で切ってあるときは、時刻だけ進めて何も描かない */
   if (!settings.drips) { brew.at = now; return; }
   const dpr = Math.min(2, window.devicePixelRatio || 1);
   /* 高さも見ること。端末のバーが出入りすると幅は変わらず高さだけ変わる。
-     そこで作り直しそこねると、描いた絵が縦に潰れて、画面の下に何も
-     ないひと帯が残る */
-  const pw = Math.round(w * dpr), ph = Math.round(h * dpr);
+     そこで作り直しそこねると、描いた絵が縦に潰れる */
+  const pw = Math.round(w * dpr), ph = Math.round(hBox * dpr);
   if (canvas.width !== pw || canvas.height !== ph) {
     canvas.width = pw;
     canvas.height = ph;
   }
   const ctx = canvas.getContext("2d");
   ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
-  ctx.clearRect(0, 0, w, h);
+  ctx.clearRect(0, 0, w, hBox);
 
   const dtMs = Math.min(120, now - (brew.at || now - 16));
   const dt = dtMs / 1000;
@@ -1197,9 +1202,9 @@ function drawBrewBackground(now) {
     ctx.beginPath();
     ctx.moveTo(0, yAt(0));
     for (let x = 0; x <= w; x += 4) ctx.lineTo(x, yAt(x));
-    /* 底は少し余分に。1pxの測り違いでも、継ぎ目が出ないように */
-    ctx.lineTo(w, h + 40);
-    ctx.lineTo(0, h + 40);
+    /* 底は箱の底まで。画面の下へはみ出したぶんまで塗りきる */
+    ctx.lineTo(w, hBox + 10);
+    ctx.lineTo(0, hBox + 10);
     ctx.closePath();
     ctx.fill();
 
@@ -2335,7 +2340,12 @@ $("s-restore-recipes").addEventListener("click", async () => {
    出入りすると 100% も dvh も実際の見え方とずれることがあり、その
    ずれが画面の下に「何もない帯」として残ってしまう */
 function fitViewport() {
-  const h = (window.visualViewport && window.visualViewport.height) || window.innerHeight;
+  /* 測り方は端末しだいで食い違う。足りないと画面の下が空くので、
+     いちばん大きいものを採る（画面の外にはみ出すぶんは見えない） */
+  const h = Math.max(
+    window.innerHeight || 0,
+    document.documentElement.clientHeight || 0,
+  );
   if (h) document.documentElement.style.setProperty("--app-h", `${Math.round(h)}px`);
 }
 fitViewport();
