@@ -19,11 +19,11 @@
  *   8. 起動
  * ==================================================================== */
 
-const APP_VERSION = "2.9.2";
+const APP_VERSION = "2.10.0";
 
 /* ホームのロゴの下に #002 の形で出す、mainへマージした回数。
    マージのたびに1つ増やす（この見た目になるまでに何回積んだか） */
-const MERGE_COUNT = 31;
+const MERGE_COUNT = 32;
 
 /* ------------------------------------------------------------------ *
  * 1. 下ごしらえ
@@ -1009,6 +1009,7 @@ const brew = {
   ripples: [],     // 水面を伝わる波
   stir: 0,         // 水面の立ち具合。落ちてこなくなると凪ぐ
   w: 0,            // 画面の幅。壁の位置を surfaceAt に伝える
+  screenH: 0,      // 実測した画面の高さ
   puffs: [],       // 湯気
   puffAt: 0,
   marks: [],       // 目盛り（各投の合計量 ml）
@@ -1027,9 +1028,9 @@ const DROP_R = 8.4;            // 標準の量の雫の半径。量に応じて�
 const DROP_MAX = 14;           // 同時に落ちる雫の数
 const BLOOM_HOLD = 4200;       // 1投目は粉が吸うぶん、落ち始めるまで間がある
 const CALM_TAU = 2.4;          // 落ちてこなくなってから、水面が凪ぐまで
-const BG_BLEED = 300;          // 背景を画面の下へはみ出させるぶん（px）。
-                               //   styles.css の .brew-bg と同じ値。画面の
-                               //   高さの測り違いは、ここが吸う
+const BG_BLEED = 320;          // 画面の底より下へ、これだけ余分に塗る。
+                               //   板は 1200px あるので、はみ出しても
+                               //   画面の外に出るだけ
 const LIQ_DEEP = 170;          // 水面からここまでで、いちばん深い色になる。
                                //   浅いままで箱の底に届くと、そこから下の
                                //   受け持ちとのあいだに段が見える
@@ -1097,14 +1098,23 @@ function drawDroplet(ctx, x, y, rx, ry, tail, accent) {
   ctx.fill();
 }
 
+/* 画面の底がどこかを、ブラウザ自身に答えさせる。
+   タイマーのボタンは position:fixed;bottom:0 で置いてあるので、その下端が
+   そのまま「見えている画面の底」になる。innerHeight も svh も dvh も端末に
+   よって実際の見え方とずれるが、ブラウザが bottom:0 を置いた位置はずれない */
+function screenBottom() {
+  const r = $("timer-foot").getBoundingClientRect();
+  return r.height ? Math.round(r.bottom) : Math.round(window.innerHeight || 0);
+}
+
 function drawBrewBackground(now) {
   const canvas = $("brew-bg");
-  /* canvas は画面より BG_BLEED ぶん背が高い。絵の位置は「画面ぶん」の
-     h で決め、液だけを箱の底まで塗る。高さの測り方が多少ずれても、
-     画面の下に何もない帯が出ないようにするため */
+  /* 板はどの画面より高い。絵の位置は実測した画面の高さ h で決め、
+     液はそこから BG_BLEED ぶん下まで塗って、底で切れないようにする */
   const w = canvas.clientWidth, hBox = canvas.clientHeight;
   if (!w || !hBox) return;
-  const h = Math.max(1, hBox - BG_BLEED);
+  const h = Math.max(1, Math.min(hBox - 20, screenBottom()));
+  const hFill = Math.min(hBox, h + BG_BLEED);
   /* 設定で切ってあるとき、タイマー画面を離れたときは何も描かない */
   if (!settings.drips || !$("screen-timer").classList.contains("active")) {
     brew.at = now;
@@ -1120,12 +1130,17 @@ function drawBrewBackground(now) {
   }
   const ctx = canvas.getContext("2d");
   ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
-  ctx.clearRect(0, 0, w, hBox);
+  ctx.clearRect(0, 0, w, hFill);
 
   const dtMs = Math.min(120, now - (brew.at || now - 16));
   const dt = dtMs / 1000;
   brew.at = now;
   brew.w = w;
+  /* 円を真ん中に置くための丈も、同じ実測値から */
+  if (brew.screenH !== h) {
+    brew.screenH = h;
+    document.documentElement.style.setProperty("--screen-h", `${h}px`);
+  }
   const t = now / 1000;
   /* 雫が落ちてこなくなると、水面はだんだん凪ぐ */
   brew.stir *= Math.exp(-dt / CALM_TAU);
@@ -1211,8 +1226,8 @@ function drawBrewBackground(now) {
     ctx.beginPath();
     ctx.moveTo(0, yAt(0));
     for (let x = 0; x <= w; x += 4) ctx.lineTo(x, yAt(x));
-    ctx.lineTo(w, hBox + 10);
-    ctx.lineTo(0, hBox + 10);
+    ctx.lineTo(w, hFill);
+    ctx.lineTo(0, hFill);
     ctx.closePath();
     ctx.fill();
 
