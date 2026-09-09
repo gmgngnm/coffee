@@ -19,11 +19,11 @@
  *   8. 起動
  * ==================================================================== */
 
-const APP_VERSION = "2.10.2";
+const APP_VERSION = "2.11.0";
 
 /* ホームのロゴの下に #002 の形で出す、mainへマージした回数。
    マージのたびに1つ増やす（この見た目になるまでに何回積んだか） */
-const MERGE_COUNT = 34;
+const MERGE_COUNT = 35;
 
 /* ------------------------------------------------------------------ *
  * 1. 下ごしらえ
@@ -405,15 +405,22 @@ function bellAt(when, base, dur, gain) {
      終わり … チーーン（低く、長く伸ばす）
    注ぐ以外の手順（混ぜる・押すなど）は1回。
    kind: "step" / "finish" / "cue"（予告） */
+/* チーンの高さ。合図は A6、淹れ終わりはその1オクターブ上の A7。
+   予告はそのあいだの C7 を、ごく小さく */
+const TONE_STEP = 1760;
+const TONE_FINISH = TONE_STEP * 2;
+const TONE_CUE = 2093;
+
 function scheduleSound(kind, when, count = 1) {
   if (!ensureAudio()) return;
   const v = volumeGain();
   if (v <= 0) return;
-  if (kind === "cue") { bellAt(when, 1568, 0.4, 0.09 * v); return; }
-  if (kind === "finish") { bellAt(when, 880, 4.4, 0.34 * v); return; }
+  if (kind === "cue") { bellAt(when, TONE_CUE, 0.4, 0.08 * v); return; }
+  /* 高い音は耳に刺さりやすいので、長く伸ばすぶん少し弱める */
+  if (kind === "finish") { bellAt(when, TONE_FINISH, 3.6, 0.24 * v); return; }
   /* 数えられる速さで、かつ間延びしない間隔 */
   for (let i = 0; i < Math.max(1, count); i++) {
-    bellAt(when + i * 0.26, 1318.5, 0.8, 0.30 * v);
+    bellAt(when + i * 0.26, TONE_STEP, 0.8, 0.26 * v);
   }
 }
 
@@ -710,13 +717,59 @@ function goBack() {
 }
 
 /* ---------- 淹れる（ホーム） ---------- */
+/* ---------- ホームのあいさつ ---------- *
+ *  時間帯ごとの束から1つ引く。ときどき、銀河英雄伝説の号令を混ぜる。
+ *  どれも1行に収まる長さ（いちばん長いもので34字）にしてある
+ * ------------------------------------------------------------------ */
+const GREETINGS = {
+  night: [                                   // 〜5時
+    "Noch ein Aufguss zu später Stunde?",
+    "Die Nacht ist lang. Noch eine?",
+    "Der Mond mahlt mit.",
+    "Wach bleiben. Wasser aufsetzen.",
+  ],
+  morning: [                                 // 〜11時
+    "Guten Morgen. Der erste Aufguss.",
+    "Frisch gemahlen schmeckt am besten.",
+    "Das Wasser ist heiß. Beginnen wir.",
+    "Der Duft weckt das Haus.",
+    "Heute ein guter Tag zum Brühen.",
+  ],
+  day: [                                     // 〜17時
+    "Zeit für eine Pause.",
+    "Ein Schluck Ruhe, bitte.",
+    "Langsam gießen, ruhig atmen.",
+    "Nach dem Kaffee die Arbeit.",
+  ],
+  evening: [                                 // それ以降
+    "Wie brühst du heute?",
+    "Der Abend gehört der Kanne.",
+    "Noch eine Tasse, dann Feierabend.",
+    "Gutes Wasser, gute Bohnen.",
+  ],
+};
+/* 銀英伝の号令。淹れる前の号令として、たまに出る */
+const GREETINGS_FLOURISH = [
+  "Feuer!",
+  "Alle Geschütze, bereit!",
+  "Gefechtsbereitschaft!",
+  "Vorwärts, ins Meer der Sterne!",
+  "Der Sieg ist unser.",
+  "Kaffee ist die halbe Schlacht.",
+];
+const pick = (list) => list[(Math.random() * list.length) | 0];
+
+function greetingFor(hour) {
+  /* 6回に1回ほど、号令が飛ぶ */
+  if (Math.random() < 0.17) return pick(GREETINGS_FLOURISH);
+  if (hour < 5) return pick(GREETINGS.night);
+  if (hour < 11) return pick(GREETINGS.morning);
+  if (hour < 17) return pick(GREETINGS.day);
+  return pick(GREETINGS.evening);
+}
+
 function renderHome() {
-  const hour = new Date().getHours();
-  $("greeting").textContent =
-    hour < 5  ? "Noch ein Aufguss zu später Stunde?" :
-    hour < 11 ? "Guten Morgen. Der erste Aufguss." :
-    hour < 17 ? "Zeit für eine Pause." :
-                "Wie brühst du heute?";
+  $("greeting").textContent = greetingFor(new Date().getHours());
 
   renderHomeStats($("home-stats"), liveBrews());
 
@@ -1369,7 +1422,7 @@ function stripCell(steps, total, i, what, forSec) {
   const to = i + 1 < steps.length ? steps[i + 1].at : total;
   const span = Math.max(0, Math.round(to - st.at));
   if (st.kind === "finish") {
-    what.textContent = "Fertig";
+    what.textContent = "Ende";
     forSec.textContent = "";
     return;
   }
@@ -1504,7 +1557,7 @@ function renderTimerLive() {
   const pours = pourTotal(steps);
 
   if (timer.state === "done") {
-    main.textContent = "Fertig";
+    main.textContent = "Ende";
     main.lang = "de";
     main.classList.remove("with-unit", "waiting", "count");
     sub.textContent = "";
