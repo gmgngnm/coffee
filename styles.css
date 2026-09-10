@@ -591,3 +591,85 @@ input[type="range"]::-moz-range-thumb{
 @media (min-width:481px){
   #app{border-left:1px solid var(--line);border-right:1px solid var(--line);}
 }
+
+/* ---------- ことばの選び口 ---------- */
+.lang-row{display:flex;gap:8px;}
+.lang-chip{
+  flex:1;appearance:none;border:1px solid var(--line);background:var(--surface);
+  color:var(--ink-soft);font:inherit;font-size:14px;padding:10px 6px;border-radius:12px;
+  cursor:pointer;transition:transform .1s ease, border-color .15s, color .15s;
+}
+.lang-chip:active{transform:scale(.97);}
+.lang-chip.on{
+  border-color:var(--accent);color:var(--accent-ink);
+  background:color-mix(in srgb, var(--accent) 9%, var(--surface));
+  font-weight:600;
+}
+
+/* ---------- 珈琲カレンダー ---------- *
+ *  枡ひとつが1日。濃さがその日の杯数。数字より、途切れと続きが形で残る
+ * ------------------------------------------------------------------ */
+.stat.tappable{position:relative;cursor:pointer;}
+.stat-more{
+  position:absolute;top:8px;right:8px;appearance:none;border:0;background:none;
+  color:var(--ink-faint);padding:2px;line-height:0;cursor:pointer;border-radius:8px;
+}
+.stat-more:active{transform:scale(.9);}
+
+.cal-bar{display:flex;align-items:center;gap:8px;margin:4px 0 14px;}
+/* 月をめくる矢は、上の「戻る」と同じ形をしている。枠を外して
+   軽くしておかないと、二つの ‹ が並んで見えて迷う */
+.cal-bar .icon-btn{background:none;border-color:transparent;color:var(--ink-faint);}
+.cal-title{
+  flex:1;text-align:center;font-size:17px;font-weight:600;
+  letter-spacing:.01em;color:var(--ink);
+}
+.cal-bar .icon-btn:disabled{opacity:.28;pointer-events:none;}
+
+.cal-dow{
+  display:grid;grid-template-columns:repeat(7,1fr);gap:6px;
+  margin-bottom:6px;
+}
+.cal-dow-cell{
+  text-align:center;font-size:11px;letter-spacing:.04em;
+  color:var(--ink-faint);text-transform:uppercase;
+}
+.cal-grid{display:grid;grid-template-columns:repeat(7,1fr);gap:6px;}
+.cal-cell{
+  appearance:none;border:1px solid var(--line);background:var(--surface);
+  aspect-ratio:1;border-radius:10px;padding:0;cursor:pointer;
+  display:flex;align-items:center;justify-content:center;
+  font:inherit;color:var(--ink-soft);
+  transition:transform .1s ease;
+}
+.cal-cell.blank{border:0;background:none;pointer-events:none;}
+.cal-cell:active{transform:scale(.93);}
+.cal-num{font-size:13px;line-height:1;font-variant-numeric:tabular-nums;}
+.cal-cell.today .cal-num{transform:translateY(-3px);}
+.cal-cell.has{color:var(--accent-ink);font-weight:600;}
+/* 濃いところは、下地が沈むので文字を明るく起こす */
+.cal-cell.deep{color:#FBF7F2;font-weight:600;}
+/* 今日は点で、選んだ日は輪で。同じ輪を二度使うと、どちらがどちらか
+   分からなくなる */
+.cal-cell{position:relative;}
+.cal-cell.today::after{
+  content:"";position:absolute;bottom:5px;left:50%;transform:translateX(-50%);
+  width:4px;height:4px;border-radius:50%;background:var(--accent);
+}
+.cal-cell.today.deep::after{background:#FBF7F2;}
+.cal-cell.ahead{opacity:.34;pointer-events:none;}
+.cal-cell.picked{border-color:var(--accent);box-shadow:0 0 0 2px var(--bg), 0 0 0 3.5px var(--accent);}
+
+.cal-foot{margin:16px 0 4px;}
+.cal-sum{font-size:13px;color:var(--ink-soft);margin:0 0 10px;line-height:1.6;}
+.cal-key{display:flex;align-items:center;gap:5px;}
+.cal-key-word{font-size:11px;color:var(--ink-faint);letter-spacing:.03em;}
+.cal-key-chip{
+  width:14px;height:14px;border-radius:4px;border:1px solid var(--line);
+  display:inline-block;
+}
+.cal-day{margin-top:20px;}
+
+/* 日本語の「4杯」は続けて組む。英独の "4 cups" だけ隙間が要る */
+:lang(ja) .stat-num .small,
+:lang(ja) .stat-strip.home .stat:not(.wide) .stat-num .small{margin-left:1px;}

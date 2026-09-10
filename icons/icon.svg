@@ -1,5 +1,7 @@
 <svg xmlns="http://www.w3.org/2000/svg" width="512" height="512" viewBox="0 0 512 512">
-  <rect width="512" height="512" rx="114" fill="#42281A"/>
+  <!-- 角は丸めない。iOS も Android も自分の型で抜くので、こちらが先に
+       丸めると、その差のぶんだけ角に白が覗く。地は端まで塗りきる -->
+  <rect width="512" height="512" fill="#42281A"/>
   <!-- マスクされる端末でも欠けないよう、絵は内側に収める -->
   <g transform="translate(256 256) scale(.9) translate(-256 -256)">
     <!-- 上のふくらみ＝ドリッパーの円錐。中は湯で満たし、そのまま
