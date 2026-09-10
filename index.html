@@ -450,10 +450,33 @@
         </div>
       </div>
 
+      <h3 class="form-head" data-i18n>Sync</h3>
+      <div class="set-group">
+        <div class="set-row stack">
+          <p class="set-note" data-i18n>Off by default. Point it at your own Supabase project and everything you log goes there too, so a second device sees the same cups.</p>
+          <div class="field mini">
+            <label for="s-cloud-url" data-i18n>Project URL</label>
+            <input id="s-cloud-url" type="url" inputmode="url" autocomplete="off" autocapitalize="off" spellcheck="false" placeholder="https://xxxx.supabase.co" data-i18n-ph>
+          </div>
+          <div class="field mini">
+            <label for="s-cloud-key" data-i18n>Anon key</label>
+            <input id="s-cloud-key" type="text" autocomplete="off" autocapitalize="off" spellcheck="false" placeholder="eyJhbGciOi…" data-i18n-ph>
+          </div>
+          <div class="btn-row">
+            <button class="wide-btn ghost" id="s-cloud-save" type="button" data-i18n>Save and check</button>
+            <button class="wide-btn ghost" id="s-cloud-help" type="button" data-help="cloud" data-i18n>How to set it up</button>
+          </div>
+        </div>
+        <div class="set-row stack" id="s-cloud-account">
+          <p class="cloud-state" id="s-cloud-state"></p>
+          <div class="btn-row" id="s-cloud-btns"></div>
+        </div>
+      </div>
+
       <h3 class="form-head" data-i18n>Your data</h3>
       <div class="set-group">
         <div class="set-row stack">
-          <p class="set-note" data-i18n>Everything you log stays on this device. No account, no server behind it. CSV opens in a spreadsheet — one row per brew, one row per recipe.</p>
+          <p class="set-note" id="s-privacy-note"></p>
           <div class="btn-row">
             <button class="wide-btn ghost" id="s-export-csv" type="button" data-i18n>Brews as CSV</button>
             <button class="wide-btn ghost" id="s-export-recipes-csv" type="button" data-i18n>Recipes as CSV</button>

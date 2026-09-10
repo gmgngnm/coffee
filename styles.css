@@ -673,3 +673,15 @@ input[type="range"]::-moz-range-thumb{
 /* 日本語の「4杯」は続けて組む。英独の "4 cups" だけ隙間が要る */
 :lang(ja) .stat-num .small,
 :lang(ja) .stat-strip.home .stat:not(.wide) .stat-num .small{margin-left:1px;}
+
+/* ---------- 雲の様子 ---------- */
+.cloud-state{
+  font-size:12.5px;line-height:1.7;color:var(--ink-soft);
+  margin:0 0 12px;word-break:break-word;
+}
+.cloud-state.bad{color:#9B3B22;}
+.set-row.stack .field.mini{margin-bottom:10px;}
+.set-row.stack .field.mini label{font-size:11px;}
+.set-group .btn-row{flex-wrap:wrap;}
+.btn-pair{display:flex;gap:10px;width:100%;}
+.btn-pair .wide-btn{flex:1;}
