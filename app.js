@@ -19,11 +19,11 @@
  *   8. 起動
  * ==================================================================== */
 
-const APP_VERSION = "2.12.0";
+const APP_VERSION = "2.13.0";
 
 /* ホームのロゴの下に #002 の形で出す、mainへマージした回数。
    マージのたびに1つ増やす（この見た目になるまでに何回積んだか） */
-const MERGE_COUNT = 36;
+const MERGE_COUNT = 37;
 
 /* ------------------------------------------------------------------ *
  * 1. 下ごしらえ
@@ -61,29 +61,809 @@ function parseClock(text) {
   return Number.isFinite(n) ? Math.round(n) : null;
 }
 
-/* 英語は1つのときだけ語尾が変わる。数と語をまとめて組む */
-function plural(n, word) {
-  return `${n} ${word}${n === 1 ? "" : "s"}`;
-}
 
 function num(value, fallback = null) {
   const n = Number(value);
   return Number.isFinite(n) ? n : fallback;
 }
 
-const WEEKDAYS = ["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"];
-const MONTHS = ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"];
-const MONTHS_FULL = ["January", "February", "March", "April", "May", "June",
-  "July", "August", "September", "October", "November", "December"];
+/* ------------------------------------------------------------------ *
+ * 1.5 ことば
+ *    英語の文そのものが鍵になっている。辞書に無ければ英語がそのまま
+ *    出るので、訳し忘れても画面は壊れない。data-i18n を付けた札は
+ *    最初に読んだ英語を覚えておき、切り替えのたびにそこから引き直す。
+ * ------------------------------------------------------------------ */
+const LANGS = [
+  { id: "en", name: "English", locale: "en-GB", weekStart: 0 },
+  { id: "ja", name: "日本語",  locale: "ja-JP", weekStart: 0 },
+  { id: "de", name: "Deutsch", locale: "de-DE", weekStart: 1 },
+];
+
+const DICT = {
+  ja: {
+    /* ホーム */
+    "Choose a recipe": "レシピを選ぶ",
+    "See all": "すべて見る",
+    "Time it without a recipe": "レシピなしで計る",
+    "Just log a brew": "記録だけつける",
+    "Latest cups": "最近の一杯",
+    "Open the log": "ログを開く",
+    "No recipes yet.": "レシピがまだありません。",
+    "brewed today": "今日淹れた数",
+    "last 30 days": "この30日",
+    "See the calendar": "カレンダーを見る",
+    /* 画面の名前 */
+    "Log": "ログ",
+    "Recipes": "レシピ",
+    "Recipe": "レシピ",
+    "Settings": "設定",
+    "Calendar": "カレンダー",
+    "Brew": "一杯",
+    "Log a brew": "一杯を記録",
+    "Edit this brew": "記録を直す",
+    "Edit recipe": "レシピを直す",
+    "New recipe": "新しいレシピ",
+    "Back": "戻る",
+    "Close": "閉じる",
+    "Save": "保存",
+    "Add": "足す",
+    "Cancel": "やめる",
+    "Delete": "消す",
+    "Got it": "わかった",
+    "Edit": "直す",
+    /* タイマー */
+    "Start": "はじめる",
+    "Stop": "やめる",
+    "Pause": "一時停止",
+    "Resume": "つづける",
+    "Reset": "やり直す",
+    "Finish": "おわる",
+    "Poured": "注いだ量",
+    "now": "いま",
+    "next": "つぎ",
+    "Sound on": "音あり",
+    "Sound off": "音なし",
+    "Sound on or off": "音の入切",
+    "Counted as one brew": "一杯として数えました",
+    "Free timer": "レシピなし",
+    /* ログ画面 */
+    "All": "すべて",
+    "4★ and up": "4★以上",
+    "This month": "今月",
+    "Search beans, brewers, notes": "豆・器具・メモを探す",
+    "Nothing logged yet.": "まだ何もありません。",
+    "Brew something and it will live here.": "淹れたら、ここに残ります。",
+    "Nothing matches that.": "見つかりませんでした。",
+    "Nothing logged yet. Brew something and it will live here.": "まだ何もありません。淹れたら、ここに残ります。",
+    "last 7 days": "この7日",
+    "average rating": "星の平均",
+    "most used": "よく使う器具",
+    "Add a brew": "記録を足す",
+    /* 記録フォーム */
+    "Brewed at": "淹れた日時",
+    "Beans": "豆",
+    "Coffee": "珈琲",
+    "Roaster": "焙煎所",
+    "Roast": "焙煎度",
+    "Not set": "未設定",
+    "Light": "浅煎り",
+    "Medium-light": "中浅煎り",
+    "Medium": "中煎り",
+    "Medium-dark": "中深煎り",
+    "Dark": "深煎り",
+    "Brewing": "淹れかた",
+    "Brewer": "器具",
+    "Grind": "挽き目",
+    "Extra fine": "極細",
+    "Fine": "細",
+    "Medium-fine": "中細",
+    "Medium-coarse": "中粗",
+    "Coarse": "粗",
+    "Grinder setting": "ミルの目盛り",
+    "Dose (g)": "粉 (g)",
+    "Water (g)": "湯 (g)",
+    "Temp (°C)": "湯温 (°C)",
+    "Brew time": "抽出時間",
+    "Ratio": "比率",
+    "Taste": "味",
+    "Overall": "総合",
+    "Overall rating": "総合の星",
+    "Acidity": "酸味",
+    "Sweetness": "甘み",
+    "Bitterness": "苦味",
+    "Body": "コク",
+    "Aroma": "香り",
+    "Flavour notes": "風味の言葉",
+    "How was it?": "どうだった？",
+    "Next time": "次はこうする",
+    "Delete this brew": "この記録を消す",
+    "e.g. Ethiopia Yirgacheffe": "例：エチオピア イルガチェフェ",
+    "e.g. the shop down the road": "例：近所の店",
+    "e.g. V60": "例：V60",
+    "e.g. Comandante, 22 clicks": "例：コマンダンテ 22クリック",
+    "Add your own word": "自分の言葉を足す",
+    "What did it taste like?": "どんな味だった？",
+    "e.g. 2°C cooler, grind a touch coarser": "例：湯温を2℃下げる、少し粗く挽く",
+    "Filled in from “%s”": "「%s」から埋めました",
+    "＋ New recipe…": "＋ 新しいレシピ…",
+    /* レシピ */
+    "Name": "名前",
+    "Steps and timing": "手順と時間",
+    "Each step chimes at that time from the start. Write the water as the total you should have poured by then.":
+      "手順は、開始からその時刻にチーンと鳴ります。湯量は、そこまでに注ぎ終えているべき累計で書きます。",
+    "Add a step": "手順を足す",
+    "Finished at (total time)": "全体の時間",
+    "Notes": "メモ",
+    "Delete this recipe": "このレシピを消す",
+    "At": "時点",
+    "Kind": "種類",
+    "Total g": "累計 g",
+    "Remove this step": "この手順を消す",
+    "Add a recipe": "レシピを足す",
+    "No recipes. Add one with the + above.": "レシピがありません。上の＋から足してください。",
+    "e.g. Morning V60": "例：朝のV60",
+    "Where it came from, what to watch for": "出どころ、気をつけること",
+    "e.g. Second pour": "例：二投目",
+    "e.g. Break the crust": "例：泡を崩す",
+    "Untitled recipe": "名前のないレシピ",
+    "Untitled cup": "名前のない一杯",
+    /* 手順の種類 */
+    "Pour": "注ぐ",
+    "Wait": "待つ",
+    "Stir": "混ぜる",
+    "Swirl": "回す",
+    "Press": "押す",
+    "Ready": "完成",
+    /* 記録の詳細 */
+    "Dose": "粉",
+    "Water": "湯",
+    "Temp": "湯温",
+    "Time": "時間",
+    "How it went": "どうだったか",
+    "Taste balance": "味の輪郭",
+    "Recipe: %s": "レシピ：%s",
+    /* 設定 */
+    "Sound": "音",
+    "Chime": "チーン",
+    "Rings once per pour number": "何投目かの数だけ鳴らす",
+    "Pre-cue": "予告",
+    "A soft tick 3 seconds before": "3秒前に小さく",
+    "Volume": "音量",
+    "Hear it": "聴いてみる",
+    "While brewing": "淹れているあいだ",
+    "Countdown before start": "はじめるまでの秒読み",
+    "off": "なし",
+    "Haptics": "振動",
+    "Where the device supports it": "対応している端末で",
+    "Keep awake": "画面を消さない",
+    "Screen stays on while brewing": "淹れているあいだ点けておく",
+    "Dripping": "滴下",
+    "Coffee drips and fills the screen behind the timer": "タイマーの後ろで珈琲が落ち、溜まっていく",
+    "Look": "見た目",
+    "Roast colour": "焙煎の色",
+    "Language": "言語",
+    "Your data": "あなたのデータ",
+    "Everything you log stays on this device. No account, no server behind it. CSV opens in a spreadsheet — one row per brew, one row per recipe.":
+      "記録はこの端末の中だけにあります。アカウントも、後ろのサーバーもありません。CSVは表計算で開けます。1杯1行、1レシピ1行。",
+    "Brews as CSV": "記録をCSVで",
+    "Recipes as CSV": "レシピをCSVで",
+    "Put the starter recipes back": "最初のレシピを戻す",
+    "%s roast it is": "%sにしました",
+    "%s right now. The darker the bean, the deeper the accent.": "いまは%s。深いほど差し色が濃くなります。",
+    /* 知らせ */
+    "Logged": "記録しました",
+    "Saved": "保存しました",
+    "Deleted": "消しました",
+    "Recipe created": "レシピを作りました",
+    "Delete this brew? This cannot be undone.": "この記録を消しますか？元に戻せません。",
+    "Delete this recipe? This cannot be undone.": "このレシピを消しますか？元に戻せません。",
+    "Nothing to export yet": "まだ出すものがありません",
+    "No recipes to export": "出せるレシピがありません",
+    "They are all here already": "もう全部あります",
+    "Steps rescaled to %s g": "手順を%s gに合わせました",
+    "%s put back": "%sを戻しました",
+    "Could not open the app.<br>Try reloading the page.": "アプリを開けませんでした。<br>ページを読み込み直してください。",
+    /* カレンダー */
+    "Previous month": "前の月",
+    "Next month": "次の月",
+    "less": "少",
+    "more": "多",
+    "Nothing brewed that day.": "その日は淹れていません。",
+    "Nothing brewed this month yet.": "今月はまだ淹れていません。",
+    "%s on %s": "%s・%s",
+    "Best day %s": "いちばん多い日 %s",
+    /* はてなの中身 */
+    "The log": "ログ画面",
+    "Logging a brew": "記録のつけかた",
+    "Writing a recipe": "レシピの書きかた",
+    "What each field means": "各項目の意味",
+    "The coffee calendar": "珈琲カレンダー",
+    "On this device: %s, %s": "この端末には %s と %s",
+    "%s exported": "%sを書き出しました",
+    "Looks through beans, roasters, brewers, flavour words and everything you typed in the notes.":
+      "豆・焙煎所・器具・風味の言葉、それにメモに書いたことすべてを見て回ります。",
+    "All / 4★ and up / This month":
+      "すべて／4★以上／今月",
+    "Narrows the list below. 4★ and up is the shortcut back to the cups worth repeating.":
+      "下の一覧を絞ります。4★以上は、また淹れたい一杯への近道です。",
+    "How many brews you logged in the past seven days, today included.":
+      "今日を含めた7日間に記録した数です。",
+    "The mean of the overall stars. Brews you left unrated are not counted.":
+      "総合の星の平均です。星をつけなかった一杯は数えません。",
+    "The brewer that turns up most often across everything below.":
+      "下に並ぶ記録のなかで、いちばん多く出てくる器具です。",
+    "The list":
+      "一覧",
+    "Newest first, grouped by month. Tap a row to see the whole brew — the taste shape, the numbers, what you wrote.":
+      "新しい順、月ごとの区切りつき。行を押すと、味の輪郭も数字も書いたことも、まとめて出ます。",
+    "+ at the top":
+      "右上の＋",
+    "Logs a brew by hand, for a cup you made without the timer.":
+      "タイマーを使わずに淹れた一杯を、手で記録します。",
+    "When you brewed it. Set to now when the form opens; change it if you are writing a cup up later.":
+      "淹れた日時です。開いた時点の時刻が入ります。あとから書くときは直してください。",
+    "The beans. What you type here comes back as a suggestion next time.":
+      "豆です。ここに書いたものは、次から候補に出ます。",
+    "Who roasted them. Handy when the same origin tastes different from two shops.":
+      "焙煎した店です。同じ産地でも店で味が変わるので、効いてきます。",
+    "How dark the roast is, Light through Dark. It also picks the colour the app uses for that brew.":
+      "浅煎りから深煎りまで。この一杯にアプリが使う色も、ここで決まります。",
+    "The gear the water went through — V60, Aeropress, french press, whatever it was.":
+      "湯が通った器具です。V60でもエアロプレスでもフレンチプレスでも。",
+    "How coarse you ground, in words. Fine for espresso, coarse for a french press.":
+      "挽き目を言葉で。エスプレッソなら細、フレンチプレスなら粗。",
+    "The actual number on your grinder, e.g. Comandante, 22 clicks. This is the one that lets you repeat a cup exactly.":
+      "ミルの実際の目盛りです（例：コマンダンテ 22クリック）。同じ一杯をもう一度出すなら、ここが要です。",
+    "Dry coffee in grams, weighed before grinding.":
+      "挽く前に量った、粉になる前の豆の重さ（g）。",
+    "All the water you poured in, in grams. 1 g is 1 ml.":
+      "注いだ湯の合計（g）。1 g は 1 ml です。",
+    "Water temperature at the moment you poured. Lower is gentler on a dark roast.":
+      "注いだときの湯温です。深煎りには低めがやさしい。",
+    "How long from the first drop of water to the last, as m:ss.":
+      "最初の一滴から最後までの時間を m:ss で。",
+    "Worked out for you from dose and water. 1:16 means 16 g of water per gram of coffee — around there is the usual place to start.":
+      "粉と湯から自動で出ます。1:16 は粉1 gに湯16 g。まずはそのあたりから。",
+    "One to five stars, your own verdict. Nothing else in the app is calculated from it except the average.":
+      "自分の判定を星5つで。平均を出す以外に、この数字は何にも使われません。",
+    "The bright, fruity edge — lemon, berry. 1 is flat, 5 is sharp.":
+      "レモンやベリーのような明るさ。1で平ら、5で鋭い。",
+    "Sugar, caramel, ripe fruit. Usually what comes back when the grind is right.":
+      "砂糖、カラメル、熟した果実。挽き目が合うと戻ってくる味です。",
+    "The dry, dark side. A high one often means too fine, too hot or too long.":
+      "乾いた暗い側。高いときは、細すぎ・熱すぎ・長すぎのことが多い。",
+    "How heavy it feels in the mouth, from tea-like to syrupy.":
+      "口のなかの重さ。お茶のようか、蜜のようか。",
+    "How much it gives off before you drink it.":
+      "飲む前に立ちのぼる量です。",
+    "Tap the words that fit, or add your own. They come back in search.":
+      "合う言葉を押すか、自分で足してください。あとで検索に出ます。",
+    "Free writing about the cup you actually drank.":
+      "実際に飲んだ一杯について、自由に。",
+    "The one change you want to make on the next go. Read it before you brew these beans again.":
+      "次に変えたいことをひとつ。この豆をまた淹れる前に読み返してください。",
+    "What you will pick it by on the home screen, e.g. Morning V60.":
+      "ホーム画面で選ぶときの名前です（例：朝のV60）。",
+    "The dripper or press this recipe is written for.":
+      "このレシピが想定している器具です。",
+    "How coarse to grind for it.":
+      "このレシピの挽き目です。",
+    "Dry coffee in grams.":
+      "粉の量（g）。",
+    "The total water the recipe pours. Change this and every step below moves by the same proportion, so the shape of the recipe survives.":
+      "レシピ全体で注ぐ湯の量です。ここを変えると下の手順も同じ割合で動くので、レシピの形は崩れません。",
+    "Water temperature to brew at.":
+      "淹れる湯温です。",
+    "When the step happens, counted from the start, as m:ss. The first one is usually 0:00.":
+      "開始からその手順までの時刻を m:ss で。ふつう最初は 0:00 です。",
+    "What you do: Pour, Wait, Stir, Swirl, Press or Ready. Only Pour takes an amount of water.":
+      "することを選びます：注ぐ・待つ・混ぜる・回す・押す・できあがり。湯量を持つのは「注ぐ」だけです。",
+    "The water you should have poured by the end of that step — cumulative, not the amount for that pour alone. So 60 then 150 means pour 60 g, then another 90 g.":
+      "その手順を終えた時点までに注ぎ終えているべき合計です。その回だけの量ではありません。60のあと150なら、60 g注いでから、さらに90 g。",
+    "A short label the timer shows while that step is running, e.g. Bloom or Circles from the middle out.":
+      "その手順のあいだタイマーに出る短い言葉です（例：蒸らし、中心から外へ円を描く）。",
+    "When the whole brew is done. The timer rings its last chime here.":
+      "全体が終わる時刻です。最後のチーンはここで鳴ります。",
+    "Anything about the recipe itself — where it came from, what to watch for.":
+      "レシピそのものについて。出どころや、気をつけることなど。",
+    "Each square is a day. The darker it is, the more you brewed.":
+      "四角ひとつが1日です。濃いほど、たくさん淹れた日。",
+    "Tap a day to see what you brewed then.":
+      "日を押すと、その日に淹れたものが出ます。",
+    "‹ and ›":
+      "‹ と ›",
+    "Move a month back or forward. It stops at this month — the future has no coffee in it yet.":
+      "月を前後に動かします。今月で止まります。先の月には、まだ珈琲がありません。",
+    "The line under the grid":
+      "枡の下の行",
+    "How many cups this month, over how many days, and the busiest single day.":
+      "その月の杯数、淹れた日数、いちばん多かった日です。",
+    "Gear": "道具",
+    "Brew this recipe again": "このレシピでまた淹れる",
+    "Start a new log from this": "これをもとに新しく記録する",
+    "Each square is a day": "枡ひとつが1日",
+    "Tapping a day": "日を押す",
+    "Floral": "花",
+    "Berry": "ベリー",
+    "Citrus": "柑橘",
+    "Apple": "りんご",
+    "Grape": "ぶどう",
+    "Honey": "蜂蜜",
+    "Chocolate": "チョコレート",
+    "Nutty": "ナッツ",
+    "Caramel": "カラメル",
+    "Spice": "スパイス",
+    "Tea-like": "お茶のよう",
+    "Grassy": "青草",
+    "Ashy": "灰っぽい",
+    "4:6 Method": "4:6メソッド",
+    "V60 Everyday Cup": "V60 ふだんの一杯",
+    "French Press": "フレンチプレス",
+    "AeroPress (standard)": "エアロプレス（標準）",
+    "Iced (flash chilled)": "アイス（急冷）",
+    "French press": "フレンチプレス",
+    "AeroPress": "エアロプレス",
+    "First pour": "一投目",
+    "Second pour": "二投目",
+    "Third pour": "三投目",
+    "Fourth pour": "四投目",
+    "Fifth pour": "五投目",
+    "Drawdown": "落ちきり",
+    "Bloom": "蒸らし",
+    "Pour it all": "一気に注ぐ",
+    "Break the crust": "泡を崩す",
+    "Press the plunger": "プランジャーを押す",
+    "Pour it out": "注ぎ切る",
+    "Stir ten times": "10回混ぜる",
+    "100 g ice in the carafe": "サーバーに氷100 g",
+    "Swirl to chill": "回して冷やす",
+    "The first half sets the sweetness": "前半で甘みが決まる",
+    "The second half sets the strength": "後半で濃さが決まる",
+    "Wet all the grounds and wait 30 s": "粉全体を濡らして30秒待つ",
+    "Circles from the middle out": "中心から外へ円を描く",
+    "Reach every bit of the grounds": "粉のすみずみまで",
+    "Nudge the surface with a spoon": "スプーンで表面をつつく",
+    "Slowly, all the way down": "ゆっくり、最後まで",
+    "Do not leave it sitting": "置きっぱなしにしない",
+    "Take a slow 30 s": "30秒かけてゆっくり",
+    "Ice goes in first": "氷が先",
+    "Two pours for sweetness and acidity, three more for strength.": "前2投で甘みと酸味、後3投で濃さ。",
+    "The one to fall back on. A plain 1:16.": "迷ったらこれ。素直な1:16。",
+    "Steep and wait. Coarse grind, four minutes.": "浸けて待つ。粗挽きで4分。",
+    "Cooler water. How fast you press changes everything.": "低めの湯温。押す速さで変わる。",
+    "200 g water over 100 g ice. Brew it strong, chill it fast.": "氷100 gに湯200 g。濃く淹れて、一気に冷やす。",
+    "Search": "さがす",
+  },
+  de: {
+    "Choose a recipe": "Rezept wählen",
+    "See all": "Alle ansehen",
+    "Time it without a recipe": "Ohne Rezept messen",
+    "Just log a brew": "Nur eintragen",
+    "Latest cups": "Zuletzt gebrüht",
+    "Open the log": "Log öffnen",
+    "No recipes yet.": "Noch keine Rezepte.",
+    "brewed today": "heute gebrüht",
+    "last 30 days": "letzte 30 Tage",
+    "See the calendar": "Zum Kalender",
+    "Log": "Log",
+    "Recipes": "Rezepte",
+    "Recipe": "Rezept",
+    "Settings": "Einstellungen",
+    "Calendar": "Kalender",
+    "Brew": "Tasse",
+    "Log a brew": "Tasse eintragen",
+    "Edit this brew": "Tasse bearbeiten",
+    "Edit recipe": "Rezept bearbeiten",
+    "New recipe": "Neues Rezept",
+    "Back": "Zurück",
+    "Close": "Schließen",
+    "Save": "Sichern",
+    "Add": "Hinzu",
+    "Cancel": "Abbrechen",
+    "Delete": "Löschen",
+    "Got it": "Verstanden",
+    "Edit": "Bearbeiten",
+    "Start": "Start",
+    "Stop": "Stopp",
+    "Pause": "Pause",
+    "Resume": "Weiter",
+    "Reset": "Zurücksetzen",
+    "Finish": "Beenden",
+    "Poured": "Gegossen",
+    "now": "jetzt",
+    "next": "gleich",
+    "Sound on": "Ton an",
+    "Sound off": "Ton aus",
+    "Sound on or off": "Ton an oder aus",
+    "Counted as one brew": "Als eine Tasse gezählt",
+    "Free timer": "Freier Timer",
+    "All": "Alle",
+    "4★ and up": "Ab 4★",
+    "This month": "Dieser Monat",
+    "Search beans, brewers, notes": "Bohnen, Brüher, Notizen suchen",
+    "Nothing logged yet.": "Noch nichts eingetragen.",
+    "Brew something and it will live here.": "Brüh etwas, dann steht es hier.",
+    "Nothing matches that.": "Dazu passt nichts.",
+    "Nothing logged yet. Brew something and it will live here.": "Noch nichts eingetragen. Brüh etwas, dann steht es hier.",
+    "last 7 days": "letzte 7 Tage",
+    "average rating": "Durchschnitt",
+    "most used": "am häufigsten",
+    "Add a brew": "Tasse hinzufügen",
+    "Brewed at": "Gebrüht am",
+    "Beans": "Bohnen",
+    "Coffee": "Kaffee",
+    "Roaster": "Rösterei",
+    "Roast": "Röstgrad",
+    "Not set": "Nicht gesetzt",
+    "Light": "Hell",
+    "Medium-light": "Mittelhell",
+    "Medium": "Mittel",
+    "Medium-dark": "Mitteldunkel",
+    "Dark": "Dunkel",
+    "Brewing": "Zubereitung",
+    "Brewer": "Brüher",
+    "Grind": "Mahlgrad",
+    "Extra fine": "Sehr fein",
+    "Fine": "Fein",
+    "Medium-fine": "Mittelfein",
+    "Medium-coarse": "Mittelgrob",
+    "Coarse": "Grob",
+    "Grinder setting": "Mühleneinstellung",
+    "Dose (g)": "Kaffee (g)",
+    "Water (g)": "Wasser (g)",
+    "Temp (°C)": "Temp. (°C)",
+    "Brew time": "Brühzeit",
+    "Ratio": "Verhältnis",
+    "Taste": "Geschmack",
+    "Overall": "Gesamt",
+    "Overall rating": "Gesamtnote",
+    "Acidity": "Säure",
+    "Sweetness": "Süße",
+    "Bitterness": "Bitterkeit",
+    "Body": "Körper",
+    "Aroma": "Aroma",
+    "Flavour notes": "Aromen",
+    "How was it?": "Wie war sie?",
+    "Next time": "Nächstes Mal",
+    "Delete this brew": "Diese Tasse löschen",
+    "e.g. Ethiopia Yirgacheffe": "z. B. Äthiopien Yirgacheffe",
+    "e.g. the shop down the road": "z. B. der Laden um die Ecke",
+    "e.g. V60": "z. B. V60",
+    "e.g. Comandante, 22 clicks": "z. B. Comandante, 22 Klicks",
+    "Add your own word": "Eigenes Wort hinzufügen",
+    "What did it taste like?": "Wonach hat sie geschmeckt?",
+    "e.g. 2°C cooler, grind a touch coarser": "z. B. 2 °C kühler, etwas gröber mahlen",
+    "Filled in from “%s”": "Aus „%s“ übernommen",
+    "＋ New recipe…": "＋ Neues Rezept …",
+    "Name": "Name",
+    "Steps and timing": "Schritte und Zeiten",
+    "Each step chimes at that time from the start. Write the water as the total you should have poured by then.":
+      "Jeder Schritt läutet zu dieser Zeit ab Beginn. Trag das Wasser als Gesamtmenge ein, die bis dahin gegossen sein soll.",
+    "Add a step": "Schritt hinzufügen",
+    "Finished at (total time)": "Fertig um (Gesamtzeit)",
+    "Notes": "Notizen",
+    "Delete this recipe": "Dieses Rezept löschen",
+    "At": "Zeit",
+    "Kind": "Art",
+    "Total g": "Gesamt g",
+    "Remove this step": "Diesen Schritt entfernen",
+    "Add a recipe": "Rezept hinzufügen",
+    "No recipes. Add one with the + above.": "Keine Rezepte. Leg oben mit + eines an.",
+    "e.g. Morning V60": "z. B. Morgen-V60",
+    "Where it came from, what to watch for": "Woher es kommt, worauf zu achten ist",
+    "e.g. Second pour": "z. B. Zweiter Guss",
+    "e.g. Break the crust": "z. B. Kruste brechen",
+    "Untitled recipe": "Rezept ohne Namen",
+    "Untitled cup": "Tasse ohne Namen",
+    "Pour": "Gießen",
+    "Wait": "Warten",
+    "Stir": "Rühren",
+    "Swirl": "Schwenken",
+    "Press": "Drücken",
+    "Ready": "Fertig",
+    "Dose": "Kaffee",
+    "Water": "Wasser",
+    "Temp": "Temp.",
+    "Time": "Zeit",
+    "How it went": "Wie es lief",
+    "Taste balance": "Geschmacksbild",
+    "Recipe: %s": "Rezept: %s",
+    "Sound": "Ton",
+    "Chime": "Glocke",
+    "Rings once per pour number": "Läutet so oft wie der Guss zählt",
+    "Pre-cue": "Vorwarnung",
+    "A soft tick 3 seconds before": "Ein leises Ticken 3 Sekunden vorher",
+    "Volume": "Lautstärke",
+    "Hear it": "Anhören",
+    "While brewing": "Beim Brühen",
+    "Countdown before start": "Countdown vor dem Start",
+    "off": "aus",
+    "Haptics": "Vibration",
+    "Where the device supports it": "Wo das Gerät es kann",
+    "Keep awake": "Bildschirm anlassen",
+    "Screen stays on while brewing": "Bleibt beim Brühen an",
+    "Dripping": "Tropfen",
+    "Coffee drips and fills the screen behind the timer": "Kaffee tropft und füllt den Grund hinter dem Timer",
+    "Look": "Aussehen",
+    "Roast colour": "Röstfarbe",
+    "Language": "Sprache",
+    "Your data": "Deine Daten",
+    "Everything you log stays on this device. No account, no server behind it. CSV opens in a spreadsheet — one row per brew, one row per recipe.":
+      "Alles Eingetragene bleibt auf diesem Gerät. Kein Konto, kein Server dahinter. CSV öffnet sich in der Tabelle — eine Zeile je Tasse, eine je Rezept.",
+    "Brews as CSV": "Tassen als CSV",
+    "Recipes as CSV": "Rezepte als CSV",
+    "Put the starter recipes back": "Startrezepte zurückholen",
+    "%s roast it is": "Also %s",
+    "%s right now. The darker the bean, the deeper the accent.": "Gerade %s. Je dunkler die Bohne, desto tiefer der Akzent.",
+    "Logged": "Eingetragen",
+    "Saved": "Gesichert",
+    "Deleted": "Gelöscht",
+    "Recipe created": "Rezept angelegt",
+    "Delete this brew? This cannot be undone.": "Diese Tasse löschen? Das lässt sich nicht rückgängig machen.",
+    "Delete this recipe? This cannot be undone.": "Dieses Rezept löschen? Das lässt sich nicht rückgängig machen.",
+    "Nothing to export yet": "Noch nichts auszugeben",
+    "No recipes to export": "Keine Rezepte auszugeben",
+    "They are all here already": "Sind schon alle da",
+    "Steps rescaled to %s g": "Schritte auf %s g umgerechnet",
+    "%s put back": "%s zurückgeholt",
+    "Could not open the app.<br>Try reloading the page.": "Die App ließ sich nicht öffnen.<br>Lade die Seite neu.",
+    "Previous month": "Voriger Monat",
+    "Next month": "Nächster Monat",
+    "less": "wenig",
+    "more": "viel",
+    "Nothing brewed that day.": "An dem Tag nichts gebrüht.",
+    "Nothing brewed this month yet.": "Diesen Monat noch nichts gebrüht.",
+    "%s on %s": "%s an %s",
+    "Best day %s": "Bester Tag %s",
+    "The log": "Das Log",
+    "Logging a brew": "Eine Tasse eintragen",
+    "Writing a recipe": "Ein Rezept schreiben",
+    "What each field means": "Was jedes Feld bedeutet",
+    "The coffee calendar": "Der Kaffeekalender",
+    "On this device: %s, %s": "Auf diesem Gerät: %s, %s",
+    "%s exported": "%s ausgegeben",
+    "Looks through beans, roasters, brewers, flavour words and everything you typed in the notes.":
+      "Durchsucht Bohnen, Röstereien, Brüher, Aromenwörter und alles, was du in die Notizen geschrieben hast.",
+    "All / 4★ and up / This month":
+      "Alle / Ab 4★ / Dieser Monat",
+    "Narrows the list below. 4★ and up is the shortcut back to the cups worth repeating.":
+      "Grenzt die Liste ein. Ab 4★ ist die Abkürzung zu den Tassen, die eine Wiederholung wert sind.",
+    "How many brews you logged in the past seven days, today included.":
+      "Wie viele Tassen du in den letzten sieben Tagen eingetragen hast, heute mitgezählt.",
+    "The mean of the overall stars. Brews you left unrated are not counted.":
+      "Der Mittelwert der Gesamtsterne. Unbewertete Tassen zählen nicht mit.",
+    "The brewer that turns up most often across everything below.":
+      "Der Brüher, der unten am häufigsten vorkommt.",
+    "The list":
+      "Die Liste",
+    "Newest first, grouped by month. Tap a row to see the whole brew — the taste shape, the numbers, what you wrote.":
+      "Neueste zuerst, nach Monat gruppiert. Tippe eine Zeile an für die ganze Tasse — Geschmacksbild, Zahlen, deine Worte.",
+    "+ at the top":
+      "+ oben",
+    "Logs a brew by hand, for a cup you made without the timer.":
+      "Trägt eine Tasse von Hand ein, für einen Aufguss ohne Timer.",
+    "When you brewed it. Set to now when the form opens; change it if you are writing a cup up later.":
+      "Wann du gebrüht hast. Steht beim Öffnen auf jetzt; ändere es, wenn du später nachträgst.",
+    "The beans. What you type here comes back as a suggestion next time.":
+      "Die Bohnen. Was du hier tippst, kommt beim nächsten Mal als Vorschlag zurück.",
+    "Who roasted them. Handy when the same origin tastes different from two shops.":
+      "Wer sie geröstet hat. Nützlich, wenn derselbe Ursprung aus zwei Läden anders schmeckt.",
+    "How dark the roast is, Light through Dark. It also picks the colour the app uses for that brew.":
+      "Wie dunkel geröstet, von Hell bis Dunkel. Das wählt auch die Farbe, die die App für diese Tasse nimmt.",
+    "The gear the water went through — V60, Aeropress, french press, whatever it was.":
+      "Das Gerät, durch das das Wasser lief — V60, AeroPress, French Press, was auch immer.",
+    "How coarse you ground, in words. Fine for espresso, coarse for a french press.":
+      "Wie grob du gemahlen hast, in Worten. Fein für Espresso, grob für die French Press.",
+    "The actual number on your grinder, e.g. Comandante, 22 clicks. This is the one that lets you repeat a cup exactly.":
+      "Die tatsächliche Zahl an deiner Mühle, z. B. Comandante, 22 Klicks. Damit lässt sich eine Tasse genau wiederholen.",
+    "Dry coffee in grams, weighed before grinding.":
+      "Trockener Kaffee in Gramm, vor dem Mahlen gewogen.",
+    "All the water you poured in, in grams. 1 g is 1 ml.":
+      "Alles Wasser, das du gegossen hast, in Gramm. 1 g ist 1 ml.",
+    "Water temperature at the moment you poured. Lower is gentler on a dark roast.":
+      "Wassertemperatur beim Gießen. Kühler ist sanfter zu einer dunklen Röstung.",
+    "How long from the first drop of water to the last, as m:ss.":
+      "Vom ersten bis zum letzten Tropfen, als m:ss.",
+    "Worked out for you from dose and water. 1:16 means 16 g of water per gram of coffee — around there is the usual place to start.":
+      "Wird aus Kaffee und Wasser errechnet. 1:16 heißt 16 g Wasser je Gramm Kaffee — da fängt man üblicherweise an.",
+    "One to five stars, your own verdict. Nothing else in the app is calculated from it except the average.":
+      "Ein bis fünf Sterne, dein eigenes Urteil. Außer dem Durchschnitt rechnet die App nichts damit.",
+    "The bright, fruity edge — lemon, berry. 1 is flat, 5 is sharp.":
+      "Die helle, fruchtige Kante — Zitrone, Beere. 1 ist flach, 5 ist scharf.",
+    "Sugar, caramel, ripe fruit. Usually what comes back when the grind is right.":
+      "Zucker, Karamell, reife Frucht. Kommt meist zurück, wenn der Mahlgrad stimmt.",
+    "The dry, dark side. A high one often means too fine, too hot or too long.":
+      "Die trockene, dunkle Seite. Ein hoher Wert heißt oft zu fein, zu heiß oder zu lang.",
+    "How heavy it feels in the mouth, from tea-like to syrupy.":
+      "Wie schwer sie im Mund liegt, von teeartig bis sirupartig.",
+    "How much it gives off before you drink it.":
+      "Wie viel sie abgibt, bevor du trinkst.",
+    "Tap the words that fit, or add your own. They come back in search.":
+      "Tippe die passenden Wörter an oder füg eigene hinzu. Sie kommen in der Suche zurück.",
+    "Free writing about the cup you actually drank.":
+      "Freier Text über die Tasse, die du wirklich getrunken hast.",
+    "The one change you want to make on the next go. Read it before you brew these beans again.":
+      "Die eine Änderung fürs nächste Mal. Lies sie, bevor du diese Bohnen wieder brühst.",
+    "What you will pick it by on the home screen, e.g. Morning V60.":
+      "Der Name, unter dem du es auf der Startseite wählst, z. B. Morgen-V60.",
+    "The dripper or press this recipe is written for.":
+      "Der Dripper oder die Presse, für die dieses Rezept geschrieben ist.",
+    "How coarse to grind for it.":
+      "Wie grob dafür zu mahlen ist.",
+    "Dry coffee in grams.":
+      "Trockener Kaffee in Gramm.",
+    "The total water the recipe pours. Change this and every step below moves by the same proportion, so the shape of the recipe survives.":
+      "Das gesamte Wasser des Rezepts. Änderst du das, wandern alle Schritte im gleichen Verhältnis mit — die Form des Rezepts bleibt.",
+    "Water temperature to brew at.":
+      "Die Wassertemperatur zum Brühen.",
+    "When the step happens, counted from the start, as m:ss. The first one is usually 0:00.":
+      "Wann der Schritt kommt, ab Beginn gezählt, als m:ss. Der erste steht meist auf 0:00.",
+    "What you do: Pour, Wait, Stir, Swirl, Press or Ready. Only Pour takes an amount of water.":
+      "Was du tust: Gießen, Warten, Rühren, Schwenken, Drücken oder Fertig. Nur Gießen nimmt eine Wassermenge.",
+    "The water you should have poured by the end of that step — cumulative, not the amount for that pour alone. So 60 then 150 means pour 60 g, then another 90 g.":
+      "Das Wasser, das bis zum Ende dieses Schritts gegossen sein soll — kumulativ, nicht die Menge dieses einen Gusses. 60, dann 150 heißt also: 60 g gießen, dann weitere 90 g.",
+    "A short label the timer shows while that step is running, e.g. Bloom or Circles from the middle out.":
+      "Ein kurzes Wort, das der Timer während des Schritts zeigt, z. B. Blooming oder Kreise von innen nach außen.",
+    "When the whole brew is done. The timer rings its last chime here.":
+      "Wann der ganze Aufguss fertig ist. Hier läutet der Timer zum letzten Mal.",
+    "Anything about the recipe itself — where it came from, what to watch for.":
+      "Alles zum Rezept selbst — woher es kommt, worauf zu achten ist.",
+    "Each square is a day. The darker it is, the more you brewed.":
+      "Jedes Feld ist ein Tag. Je dunkler, desto mehr gebrüht.",
+    "Tap a day to see what you brewed then.":
+      "Tippe einen Tag an, um zu sehen, was du gebrüht hast.",
+    "‹ and ›":
+      "‹ und ›",
+    "Move a month back or forward. It stops at this month — the future has no coffee in it yet.":
+      "Einen Monat zurück oder vor. Bei diesem Monat ist Schluss — in der Zukunft ist noch kein Kaffee.",
+    "The line under the grid":
+      "Die Zeile unter dem Raster",
+    "How many cups this month, over how many days, and the busiest single day.":
+      "Wie viele Tassen in diesem Monat, an wie vielen Tagen, und der dichteste Tag.",
+    "Gear": "Gerät",
+    "Brew this recipe again": "Dieses Rezept nochmal brühen",
+    "Start a new log from this": "Neuen Eintrag daraus beginnen",
+    "Each square is a day": "Jedes Feld ein Tag",
+    "Tapping a day": "Einen Tag antippen",
+    "Floral": "Blumig",
+    "Berry": "Beere",
+    "Citrus": "Zitrus",
+    "Apple": "Apfel",
+    "Grape": "Traube",
+    "Honey": "Honig",
+    "Chocolate": "Schokolade",
+    "Nutty": "Nussig",
+    "Caramel": "Karamell",
+    "Spice": "Gewürz",
+    "Tea-like": "Teeartig",
+    "Grassy": "Grasig",
+    "Ashy": "Aschig",
+    "4:6 Method": "4:6-Methode",
+    "V60 Everyday Cup": "V60 für jeden Tag",
+    "French Press": "French Press",
+    "AeroPress (standard)": "AeroPress (Standard)",
+    "Iced (flash chilled)": "Eiskaffee (schnell gekühlt)",
+    "French press": "French Press",
+    "AeroPress": "AeroPress",
+    "First pour": "Erster Guss",
+    "Second pour": "Zweiter Guss",
+    "Third pour": "Dritter Guss",
+    "Fourth pour": "Vierter Guss",
+    "Fifth pour": "Fünfter Guss",
+    "Drawdown": "Durchlauf",
+    "Bloom": "Blooming",
+    "Pour it all": "Alles auf einmal",
+    "Break the crust": "Kruste brechen",
+    "Press the plunger": "Stempel drücken",
+    "Pour it out": "Ausgießen",
+    "Stir ten times": "Zehnmal rühren",
+    "100 g ice in the carafe": "100 g Eis in die Kanne",
+    "Swirl to chill": "Zum Kühlen schwenken",
+    "The first half sets the sweetness": "Die erste Hälfte macht die Süße",
+    "The second half sets the strength": "Die zweite Hälfte macht die Stärke",
+    "Wet all the grounds and wait 30 s": "Alles Mehl benetzen und 30 s warten",
+    "Circles from the middle out": "Kreise von innen nach außen",
+    "Reach every bit of the grounds": "Jedes Krümelchen erreichen",
+    "Nudge the surface with a spoon": "Die Oberfläche mit dem Löffel anstupsen",
+    "Slowly, all the way down": "Langsam, ganz nach unten",
+    "Do not leave it sitting": "Nicht stehen lassen",
+    "Take a slow 30 s": "Nimm dir 30 langsame Sekunden",
+    "Ice goes in first": "Das Eis kommt zuerst",
+    "Two pours for sweetness and acidity, three more for strength.": "Zwei Güsse für Süße und Säure, drei weitere für Stärke.",
+    "The one to fall back on. A plain 1:16.": "Das Rezept für alle Fälle. Schlicht 1:16.",
+    "Steep and wait. Coarse grind, four minutes.": "Ziehen lassen. Grob gemahlen, vier Minuten.",
+    "Cooler water. How fast you press changes everything.": "Kühleres Wasser. Wie schnell du drückst, ändert alles.",
+    "200 g water over 100 g ice. Brew it strong, chill it fast.": "200 g Wasser auf 100 g Eis. Stark brühen, schnell kühlen.",
+    "Search": "Suche",
+  },
+};
+
+const langId = () => (typeof settings !== "undefined" && settings.lang) || "en";
+const langDef = () => LANGS.find((l) => l.id === langId()) || LANGS[0];
+
+/* 英語そのものが鍵。%s は順に埋める */
+function t(en, ...vars) {
+  const d = DICT[langId()];
+  let out = (d && d[en]) || en;
+  for (const v of vars) out = out.replace("%s", String(v));
+  return out;
+}
+
+/* 数と語をまとめて組む。日本語は助数詞で、単複の区別が要らない */
+const COUNTED = {
+  en: {
+    cup: (n) => `${n} cup${n === 1 ? "" : "s"}`,
+    day: (n) => `${n} day${n === 1 ? "" : "s"}`,
+    brew: (n) => `${n} brew${n === 1 ? "" : "s"}`,
+    recipe: (n) => `${n} recipe${n === 1 ? "" : "s"}`,
+  },
+  ja: {
+    cup: (n) => `${n}杯`,
+    day: (n) => `${n}日`,
+    brew: (n) => `${n}件の記録`,
+    recipe: (n) => `${n}件のレシピ`,
+  },
+  de: {
+    cup: (n) => `${n} ${n === 1 ? "Tasse" : "Tassen"}`,
+    day: (n) => `${n} ${n === 1 ? "Tag" : "Tagen"}`,
+    brew: (n) => `${n} ${n === 1 ? "Eintrag" : "Einträge"}`,
+    recipe: (n) => `${n} ${n === 1 ? "Rezept" : "Rezepte"}`,
+  },
+};
+function counted(n, word) {
+  const set = COUNTED[langId()] || COUNTED.en;
+  return (set[word] || COUNTED.en[word])(n);
+}
+/* 大きな数字のすぐ下に添える短い単位。日本語は語そのものが単位になる */
+function unitWord(n, word) {
+  const s = counted(n, word);
+  return s.replace(/^\d+\s?/, "") || word;
+}
+
+/* 札に書いてある英語を鍵として覚え、切り替えのたびにそこから引き直す */
+function applyLang() {
+  const l = langDef();
+  document.documentElement.lang = l.id;
+  const grab = (node, attr, store) => {
+    if (node.dataset[store] === undefined) {
+      node.dataset[store] = attr === "text" ? node.textContent.trim() : (node.getAttribute(attr) || "");
+    }
+    return node.dataset[store];
+  };
+  for (const node of document.querySelectorAll("[data-i18n]")) {
+    node.textContent = t(grab(node, "text", "i18nKey"));
+  }
+  for (const node of document.querySelectorAll("[data-i18n-ph]")) {
+    node.setAttribute("placeholder", t(grab(node, "placeholder", "i18nPhKey")));
+  }
+  for (const node of document.querySelectorAll("[data-i18n-label]")) {
+    const key = grab(node, "aria-label", "i18nLabelKey");
+    node.setAttribute("aria-label", t(key));
+    if (node.hasAttribute("title")) node.setAttribute("title", t(key));
+  }
+}
+
+/* 日付は Intl に任せる。3言語ぶんの月名と曜日名を自分で抱えずに済み、
+   その言語の並び（日本語なら「9月10日」）にもそのまま乗る */
+const dateFmt = (opts) => new Intl.DateTimeFormat(langDef().locale, opts);
 
 function fmtDate(ms) {
-  const d = new Date(ms);
-  return `${WEEKDAYS[d.getDay()]} ${d.getDate()} ${MONTHS[d.getMonth()]}`;
+  return dateFmt({ weekday: "short", day: "numeric", month: "short" }).format(new Date(ms));
 }
 function fmtDateTime(ms) {
+  return dateFmt({ day: "numeric", month: "short", year: "numeric", hour: "2-digit", minute: "2-digit" }).format(new Date(ms));
+}
+function fmtMonthYear(d) {
+  return dateFmt({ year: "numeric", month: "long" }).format(d);
+}
+function fmtDayLong(ms) {
+  return dateFmt({ weekday: "long", day: "numeric", month: "long" }).format(new Date(ms));
+}
+/* 表計算に渡す欄だけは、言語に関わらず読み方の変わらない形にしておく */
+function fmtStamp(ms) {
   const d = new Date(ms);
   const p = (n) => String(n).padStart(2, "0");
-  return `${d.getDate()} ${MONTHS[d.getMonth()]} ${d.getFullYear()}, ${p(d.getHours())}:${p(d.getMinutes())}`;
+  return `${d.getFullYear()}-${p(d.getMonth() + 1)}-${p(d.getDate())} ${p(d.getHours())}:${p(d.getMinutes())}`;
 }
 /* <input type="datetime-local"> は端末のローカル時刻の文字列を欲しがる */
 function toLocalInput(ms) {
@@ -178,6 +958,15 @@ const HELP = {
       ["Next time", "The one change you want to make on the next go. Read it before you brew these beans again."],
     ],
   },
+  calendar: {
+    title: "The coffee calendar",
+    items: [
+      ["Each square is a day", "Each square is a day. The darker it is, the more you brewed."],
+      ["Tapping a day", "Tap a day to see what you brewed then."],
+      ["‹ and ›", "Move a month back or forward. It stops at this month — the future has no coffee in it yet."],
+      ["The line under the grid", "How many cups this month, over how many days, and the busiest single day."],
+    ],
+  },
   recipe: {
     title: "Writing a recipe",
     items: [
@@ -202,12 +991,12 @@ function openHelp(which) {
   const help = HELP[which];
   if (!help) return;
   const backdrop = $("help-backdrop");
-  $("help-title").textContent = help.title;
+  $("help-title").textContent = t(help.title);
   const list = $("help-list");
   list.innerHTML = "";
   for (const [term, desc] of help.items) {
-    list.appendChild(el("dt", "help-term", term));
-    list.appendChild(el("dd", "help-desc", desc));
+    list.appendChild(el("dt", "help-term", t(term)));
+    list.appendChild(el("dd", "help-desc", t(desc)));
   }
   list.scrollTop = 0;
   backdrop.hidden = false;
@@ -316,6 +1105,7 @@ const DEFAULT_SETTINGS = {
   countdown: 3,      // 開始を押してから走り出すまでの秒数（0〜10）
   drips: true,       // 背景に、注いだぶんの雫と液面を出すか
   roast: "medium",   // アクセントの焙煎度
+  lang: "en",        // 画面のことば（en / ja / de）
 };
 let settings = { ...DEFAULT_SETTINGS };
 
@@ -397,8 +1187,12 @@ async function removeRecord(store, id) {
    使いながら自分の一杯へ寄せていくための出発点 */
 function starterRecipes() {
   const now = Date.now();
+  /* 名前も手順の言葉も、置いたときのことばで焼き付ける。ここから先は
+     ただのデータで、あとから自由に直せる */
   const mk = (name, method, grind, doseG, waterG, tempC, totalSec, steps, memo) => ({
-    id: newId(), name, method, grind, doseG, waterG, tempC, totalSec, steps, memo,
+    id: newId(), name: t(name), method, grind, doseG, waterG, tempC, totalSec,
+    steps: steps.map((st) => ({ ...st, label: st.label ? t(st.label) : "", note: st.note ? t(st.note) : "" })),
+    memo: t(memo),
     createdAt: now, updatedAt: now, usedAt: 0, deleted: false, starter: true,
   });
   return [
@@ -532,10 +1326,14 @@ function buzz(pattern) {
 /* ------------------------------------------------------------------ *
  * 6. タイマー
  * ------------------------------------------------------------------ */
-const KIND_LABEL = {
+const KIND_LABEL_EN = {
   pour: "Pour", wait: "Wait", stir: "Stir",
   swirl: "Swirl", plunge: "Press", finish: "Ready",
 };
+/* 使う側はいつも今の言葉で受け取る。保存されるのは英語の鍵のほう */
+const KIND_LABEL = new Proxy(KIND_LABEL_EN, {
+  get: (o, k) => (typeof k === "string" && o[k] ? t(o[k]) : o[k]),
+});
 
 const timer = {
   recipe: null,      // null ならレシピなしの計測
@@ -648,7 +1446,7 @@ function openTimer(recipe) {
   timer.laps = [];
   timer.startedAt = 0;
   resetBrewBackground();
-  $("timer-title").textContent = recipe ? recipe.name : "Free timer";
+  $("timer-title").textContent = recipe ? recipe.name : t("Free timer");
   renderTimerStatic();
   renderTimerLive();
   showScreen("timer");
@@ -769,6 +1567,7 @@ const SCREEN_IDS = {
   "brew-edit": "screen-brew-edit",
   recipes: "screen-recipes",
   "recipe-edit": "screen-recipe-edit",
+  calendar: "screen-calendar",
   settings: "screen-settings",
 };
 /* 出発点はいつもホーム。ほかの画面はそこから行って、戻ってくる */
@@ -865,7 +1664,7 @@ function renderHome() {
   const box = $("home-recipes");
   box.innerHTML = "";
   if (!list.length) {
-    const empty = el("p", "empty-note", "No recipes yet.");
+    const empty = el("p", "empty-note", t("No recipes yet."));
     box.appendChild(empty);
   }
   for (const r of list.slice(0, 6)) box.appendChild(recipeCard(r, false));
@@ -930,9 +1729,9 @@ function renderHomeStats(box, list) {
   const left = el("div", "stat");
   const n = el("div", "stat-num");
   n.textContent = String(today);
-  n.appendChild(el("span", "small", today === 1 ? "cup" : "cups"));
+  n.appendChild(el("span", "small", unitWord(today, "cup")));
   left.appendChild(n);
-  left.appendChild(el("div", "stat-label", "brewed today"));
+  left.appendChild(el("div", "stat-label", t("brewed today")));
   box.appendChild(left);
 
   box.appendChild(monthTrend(list, midnight));
@@ -959,9 +1758,9 @@ function monthTrend(list, midnight) {
   const head = el("div", "stat-head");
   const n = el("div", "stat-num");
   n.textContent = String(total);
-  n.appendChild(el("span", "small", total === 1 ? "cup" : "cups"));
+  n.appendChild(el("span", "small", unitWord(total, "cup")));
   head.appendChild(n);
-  const label = el("div", "stat-label", "last 30 days");
+  const label = el("div", "stat-label", t("last 30 days"));
   head.appendChild(label);
   card.appendChild(head);
 
@@ -998,30 +1797,177 @@ function monthTrend(list, midnight) {
     if (!r.width) return;
     const t = Math.min(1, Math.max(0, (clientX - r.left) / r.width));
     const i = Math.round(t * (TREND_DAYS - 1));
-    label.textContent = `${fmtDate(dateAt(i).getTime())} · ${plural(counts[i], "cup")}`;
+    label.textContent = `${fmtDate(dateAt(i).getTime())} · ${counted(counts[i], "cup")}`;
     label.classList.add("live");
     place(i);
     cross.hidden = false;
     cross.style.left = `calc(${xPct(i).toFixed(2)}% - 0.5px)`;
   };
   const off = () => {
-    label.textContent = "last 30 days";
+    label.textContent = t("last 30 days");
     label.classList.remove("live");
     place(TREND_DAYS - 1);
     cross.hidden = true;
   };
+  /* なぞればその日の数、ちょんと押せばカレンダーへ。指がほとんど動かず、
+     すぐ離れたときだけ「押した」とみなす */
+  let down = null;
   spark.addEventListener("pointerdown", (e) => {
     spark.setPointerCapture(e.pointerId);
+    down = { x: e.clientX, at: performance.now(), moved: 0 };
     at(e.clientX);
   });
   spark.addEventListener("pointermove", (e) => {
+    if (down) down.moved = Math.max(down.moved, Math.abs(e.clientX - down.x));
     if (e.pressure > 0 || e.pointerType === "mouse") at(e.clientX);
   });
-  spark.addEventListener("pointerup", off);
-  spark.addEventListener("pointercancel", off);
-  spark.addEventListener("pointerleave", off);
+  spark.addEventListener("pointerup", () => {
+    const tap = down && down.moved < 8 && performance.now() - down.at < 400;
+    down = null;
+    off();
+    if (tap) openCalendar();
+  });
+  spark.addEventListener("pointercancel", () => { down = null; off(); });
+  spark.addEventListener("pointerleave", () => { down = null; off(); });
+
+  /* 指のない相手にも道を残す */
+  const more = el("button", "stat-more");
+  more.type = "button";
+  more.setAttribute("aria-label", t("See the calendar"));
+  more.innerHTML = '<svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M9 18l6-6-6-6"/></svg>';
+  more.addEventListener("click", openCalendar);
+  card.appendChild(more);
+  card.classList.add("tappable");
   return card;
 }
+
+/* ------------------------------------------------------------------ *
+ *  珈琲カレンダー
+ *    ひと月を枡で並べ、その日に淹れた数だけ色を濃くする。折れ線が
+ *    「どれだけ」を言うのに対して、こちらは「いつ」を言う。飛んだ日も
+ *    続いた週も、形として一目で残る。
+ *    日を押すと、その日に淹れたものが下に出る。
+ * ------------------------------------------------------------------ */
+const CAL_STEPS = [0, 0.16, 0.34, 0.56, 0.78, 0.94];   // 杯数ごとの濃さ
+
+let calMonth = null;      // 表示している月の1日
+let calPicked = null;     // 選んだ日（0時のミリ秒）
+
+const midnightOf = (d) => { const x = new Date(d); x.setHours(0, 0, 0, 0); return x; };
+const monthStart = (d) => new Date(d.getFullYear(), d.getMonth(), 1);
+
+function calShade(n) {
+  const i = Math.min(n, CAL_STEPS.length - 1);
+  return CAL_STEPS[i];
+}
+
+function openCalendar() {
+  if (!calMonth) calMonth = monthStart(new Date());
+  calPicked = null;
+  renderCalendar();
+  showScreen("calendar");
+}
+
+function calShift(months) {
+  const next = new Date(calMonth.getFullYear(), calMonth.getMonth() + months, 1);
+  const cap = monthStart(new Date());
+  if (next > cap) return;
+  calMonth = next;
+  calPicked = null;
+  renderCalendar();
+}
+
+function renderCalendar() {
+  if (!calMonth) calMonth = monthStart(new Date());
+  const start = calMonth;
+  const year = start.getFullYear(), month = start.getMonth();
+  const days = new Date(year, month + 1, 0).getDate();
+  const today = midnightOf(new Date()).getTime();
+  const weekStart = langDef().weekStart;
+
+  $("cal-title").textContent = fmtMonthYear(start);
+  $("cal-next").disabled = monthStart(new Date()) <= start;
+
+  /* その月の1日ごとの杯数 */
+  const counts = new Array(days).fill(0);
+  for (const b of liveBrews()) {
+    const d = new Date(b.brewedAt);
+    if (d.getFullYear() === year && d.getMonth() === month) counts[d.getDate() - 1]++;
+  }
+
+  /* 曜日の頭文字は Intl から。日本語なら日月火、ドイツ語なら So Mo Di */
+  const dowFmt = dateFmt({ weekday: "short" });
+  const dow = $("cal-dow");
+  dow.innerHTML = "";
+  for (let i = 0; i < 7; i++) {
+    const day = (weekStart + i) % 7;
+    /* 2024-01-07 は日曜。そこから数えれば曜日名が揃う */
+    dow.appendChild(el("span", "cal-dow-cell", dowFmt.format(new Date(2024, 0, 7 + day))));
+  }
+
+  const grid = $("cal-grid");
+  grid.innerHTML = "";
+  const lead = (new Date(year, month, 1).getDay() - weekStart + 7) % 7;
+  for (let i = 0; i < lead; i++) grid.appendChild(el("span", "cal-cell blank"));
+
+  for (let d = 1; d <= days; d++) {
+    const ms = new Date(year, month, d).getTime();
+    const n = counts[d - 1];
+    const cell = el("button", "cal-cell");
+    cell.type = "button";
+    const a = calShade(n);
+    if (a) cell.style.background = `color-mix(in srgb, var(--accent) ${Math.round(a * 100)}%, var(--surface))`;
+    if (a >= 0.56) cell.classList.add("deep");
+    if (ms === today) cell.classList.add("today");
+    if (ms > today) cell.classList.add("ahead");
+    if (n) cell.classList.add("has");
+    cell.appendChild(el("span", "cal-num", String(d)));
+    cell.setAttribute("aria-label", `${fmtDayLong(ms)} · ${counted(n, "cup")}`);
+    cell.addEventListener("click", () => {
+      calPicked = calPicked === ms ? null : ms;
+      renderCalendar();
+    });
+    if (calPicked === ms) cell.classList.add("picked");
+    grid.appendChild(cell);
+  }
+
+  /* 濃さの目安 */
+  const key = $("cal-key");
+  key.innerHTML = "";
+  key.appendChild(el("span", "cal-key-word", t("less")));
+  for (const a of CAL_STEPS) {
+    const chip = el("span", "cal-key-chip");
+    chip.style.background = a
+      ? `color-mix(in srgb, var(--accent) ${Math.round(a * 100)}%, var(--surface))`
+      : "var(--surface)";
+    key.appendChild(chip);
+  }
+  key.appendChild(el("span", "cal-key-word", t("more")));
+
+  /* その月のまとめ */
+  const total = counts.reduce((a, c) => a + c, 0);
+  const onDays = counts.filter((c) => c > 0).length;
+  const peak = Math.max(0, ...counts);
+  $("cal-sum").textContent = total
+    ? `${t("%s on %s", counted(total, "cup"), counted(onDays, "day"))} · ${t("Best day %s", counted(peak, "cup"))}`
+    : t("Nothing brewed this month yet.");
+
+  /* 選んだ日の中身 */
+  const box = $("cal-day");
+  box.innerHTML = "";
+  if (calPicked === null) return;
+  const from = calPicked, to = calPicked + 86400000;
+  const of = liveBrews().filter((b) => b.brewedAt >= from && b.brewedAt < to);
+  box.appendChild(el("div", "month-head", fmtDayLong(calPicked)));
+  if (!of.length) {
+    box.appendChild(el("p", "empty-note", t("Nothing brewed that day.")));
+    return;
+  }
+  for (const b of of) box.appendChild(brewItem(b));
+}
+
+$("cal-prev").addEventListener("click", () => calShift(-1));
+$("cal-next").addEventListener("click", () => calShift(1));
 
 function renderStats(box, list) {
   const now = new Date();
@@ -1043,9 +1989,9 @@ function renderStats(box, list) {
     s.appendChild(el("div", "stat-label", label));
     return s;
   };
-  box.appendChild(cell(String(week.length), "cups", "last 7 days"));
-  box.appendChild(cell(avg ? avg.toFixed(1) : "—", avg ? "★" : "", "average rating"));
-  box.appendChild(cell(topMethod ? topMethod[0] : "—", "", "most used"));
+  box.appendChild(cell(String(week.length), unitWord(week.length, "cup"), t("last 7 days")));
+  box.appendChild(cell(avg ? avg.toFixed(1) : "—", avg ? "★" : "", t("average rating")));
+  box.appendChild(cell(topMethod ? topMethod[0] : "—", "", t("most used")));
 }
 
 /* ------------------------------------------------------------------ *
@@ -1555,9 +2501,9 @@ function renderTimerStatic() {
   const show = (id, on) => { $(id).hidden = !on; };
 
   const toggle = $("timer-toggle");
-  toggle.textContent = st === "count" ? "Stop"
+  toggle.textContent = t(st === "count" ? "Stop"
     : st === "running" ? "Pause"
-    : st === "paused" ? "Resume" : "Start";
+    : st === "paused" ? "Resume" : "Start");
   toggle.classList.toggle("running", st === "running" || st === "count");
 
   show("timer-reset", st !== "done");
@@ -1732,7 +2678,7 @@ async function logFinishedBrew() {
     if (!b.method) b.method = last.method;
   }
   await saveBrew(b);
-  toast("Counted as one brew");
+  toast(t("Counted as one brew"));
 }
 $("timer-reset").addEventListener("click", resetTimer);
 $("timer-close").addEventListener("click", () => {
@@ -1753,7 +2699,7 @@ $("timer-mute").addEventListener("click", async () => {
   await saveSettings();
   syncMuteIcon();
   if (timer.state === "running") scheduleUpcomingSounds(); else cancelScheduledSounds();
-  toast(settings.chime ? "Sound on" : "Sound off");
+  toast(settings.chime ? t("Sound on") : t("Sound off"));
 });
 function syncMuteIcon() {
   const svg = $("timer-mute").querySelector("svg");
@@ -1802,7 +2748,7 @@ function brewItem(brew) {
   const item = el("button", "brew-item");
   item.type = "button";
   const body = el("div", "bi-body");
-  body.appendChild(el("div", "bi-title", brew.bean || brew.recipeName || brew.method || "Untitled cup"));
+  body.appendChild(el("div", "bi-title", brew.bean || brew.recipeName || brew.method || t("Untitled cup")));
   const bits = [];
   if (brew.method) bits.push(brew.method);
   if (brew.doseG && brew.waterG) bits.push(`${brew.doseG}g/${brew.waterG}g`);
@@ -1845,8 +2791,8 @@ function renderLog() {
   $("log-empty").hidden = list.length > 0;
   if (!list.length) {
     $("log-empty").textContent = all.length
-      ? "Nothing matches that."
-      : "Nothing logged yet. Brew something and it will live here.";
+      ? t("Nothing matches that.")
+      : t("Nothing logged yet. Brew something and it will live here.");
     return;
   }
   let lastKey = "";
@@ -1854,7 +2800,7 @@ function renderLog() {
     const d = new Date(b.brewedAt);
     const key = `${d.getFullYear()}-${d.getMonth()}`;
     if (key !== lastKey) {
-      box.appendChild(el("div", "month-head", `${MONTHS_FULL[d.getMonth()]} ${d.getFullYear()}`));
+      box.appendChild(el("div", "month-head", fmtMonthYear(d)));
       lastKey = key;
     }
     box.appendChild(brewItem(b));
@@ -1897,7 +2843,7 @@ function tasteRadar(taste) {
     const r = (R * Math.max(0, Math.min(5, v))) / 5;
     return [cx + r * Math.cos(a), cy + r * Math.sin(a)];
   };
-  let svg = `<svg class="radar" viewBox="0 0 ${size} ${size}" role="img" aria-label="Taste balance">`;
+  let svg = `<svg class="radar" viewBox="0 0 ${size} ${size}" role="img" aria-label="${t("Taste balance")}">`;
   for (let ring = 1; ring <= 5; ring++) {
     const pts = TASTE_AXES.map((_, i) => point(i, ring).map((v) => v.toFixed(1)).join(",")).join(" ");
     svg += `<polygon class="grid" points="${pts}"/>`;
@@ -1910,7 +2856,7 @@ function tasteRadar(taste) {
   svg += `<polygon class="shape" points="${shape}"/>`;
   TASTE_AXES.forEach(([, label], i) => {
     const [x, y] = point(i, 6.3);
-    svg += `<text class="label" x="${x.toFixed(1)}" y="${(y + 3).toFixed(1)}">${label}</text>`;
+    svg += `<text class="label" x="${x.toFixed(1)}" y="${(y + 3).toFixed(1)}">${t(label)}</text>`;
   });
   return svg + "</svg>";
 }
@@ -1927,36 +2873,36 @@ function openBrewDetail(id, { replace = false } = {}) {
     `<div class="kv"><div class="kv-label">${label}</div><div class="kv-value">${value ?? "—"}${
       value != null && unit ? `<span class="unit">${unit}</span>` : ""}</div></div>`;
 
-  const tags = (b.flavors || []).map((f) => `<span class="tag">${escapeHtml(f)}</span>`).join("");
+  const tags = (b.flavors || []).map((f) => `<span class="tag">${escapeHtml(t(f))}</span>`).join("");
   const note = (head, body) => body
     ? `<div class="note-block"><div class="note-head">${head}</div><div class="note-body">${escapeHtml(body)}</div></div>`
     : "";
 
-  const sub = [b.roaster, b.roast, b.recipeName ? `Recipe: ${b.recipeName}` : "", fmtDateTime(b.brewedAt)]
+  const sub = [b.roaster, b.roast ? t(b.roast) : "", b.recipeName ? t("Recipe: %s", b.recipeName) : "", fmtDateTime(b.brewedAt)]
     .filter(Boolean).join(" · ");
 
   $("detail-body").innerHTML = `
     <div class="detail-hero">
-      <div class="dh-bean">${escapeHtml(b.bean || b.method || "Untitled cup")}</div>
+      <div class="dh-bean">${escapeHtml(b.bean || b.method || t("Untitled cup"))}</div>
       <div class="dh-sub">${escapeHtml(sub)}</div>
       <div class="dh-stars">${b.rating ? starsHtml(b.rating) : '<span class="off">★★★★★</span>'}</div>
     </div>
     <div class="kv-grid">
-      ${kv("Dose", b.doseG, "g")}
-      ${kv("Water", b.waterG, "g")}
-      ${kv("Ratio", b.doseG && b.waterG ? ratioText(b.doseG, b.waterG) : null, "")}
-      ${kv("Temp", b.tempC, "°C")}
-      ${kv("Time", b.timeSec ? fmtClock(b.timeSec) : null, "")}
-      ${kv("Grind", b.grind || null, "")}
+      ${kv(t("Dose"), b.doseG, "g")}
+      ${kv(t("Water"), b.waterG, "g")}
+      ${kv(t("Ratio"), b.doseG && b.waterG ? ratioText(b.doseG, b.waterG) : null, "")}
+      ${kv(t("Temp"), b.tempC, "°C")}
+      ${kv(t("Time"), b.timeSec ? fmtClock(b.timeSec) : null, "")}
+      ${kv(t("Grind"), b.grind ? t(b.grind) : null, "")}
     </div>
-    ${b.method || b.grinder ? `<div class="note-block"><div class="note-head">Gear</div><div class="note-body">${
+    ${b.method || b.grinder ? `<div class="note-block"><div class="note-head">${t("Gear")}</div><div class="note-body">${
       escapeHtml([b.method, b.grinder].filter(Boolean).join(" / "))}</div></div>` : ""}
     <div class="radar-box">${tasteRadar(b.taste)}</div>
     ${tags ? `<div class="tag-row">${tags}</div>` : ""}
-    ${note("How it went", b.notes)}
-    ${note("Next time", b.next)}
-    <button class="wide-btn primary" id="detail-rebrew" type="button">Brew this recipe again</button>
-    <button class="wide-btn ghost" id="detail-copy" type="button">Start a new log from this</button>
+    ${note(t("How it went"), b.notes)}
+    ${note(t("Next time"), b.next)}
+    <button class="wide-btn primary" id="detail-rebrew" type="button">${t("Brew this recipe again")}</button>
+    <button class="wide-btn ghost" id="detail-copy" type="button">${t("Start a new log from this")}</button>
   `;
 
   const rebrew = $("detail-rebrew");
@@ -1964,7 +2910,7 @@ function openBrewDetail(id, { replace = false } = {}) {
   if (recipe) {
     rebrew.addEventListener("click", () => openTimer(recipe));
   } else {
-    rebrew.textContent = "Time it without a recipe";
+    rebrew.textContent = t("Time it without a recipe");
     rebrew.addEventListener("click", () => openTimer(null));
   }
   $("detail-copy").addEventListener("click", () => {
@@ -2006,11 +2952,94 @@ function refreshSuggestLists() {
   fill("grinder-suggest", all.map((b) => b.grinder));
 }
 
+/* ---------- 記録につけるレシピ ---------- *
+ *  何で淹れたのかは、あとから思い出せないことのほうが多い。すでに書いた
+ *  レシピから選べるようにして、器具や分量が空いていればそこから埋める。
+ *  一覧に無ければ、その場で新しいレシピを書きに行ける。
+ * ------------------------------------------------------------------ */
+const NEW_RECIPE_OPT = "__new";
+let recipeReturn = null;      // レシピを書き終えたら、この記録へ戻る
+
+function renderRecipeSelect() {
+  const sel = $("f-recipe");
+  const b = editingBrew || {};
+  sel.innerHTML = "";
+  const add = (value, label) => {
+    const o = document.createElement("option");
+    o.value = value; o.textContent = label;
+    sel.appendChild(o);
+    return o;
+  };
+  add("", t("Not set"));
+  const list = liveRecipes();
+  for (const r of list) add(r.id, r.name);
+  /* 消されたレシピで淹れた記録も、名前だけは残しておく */
+  if (b.recipeName && !list.some((r) => r.id === b.recipeId)) add(b.recipeId || b.recipeName, b.recipeName);
+  add(NEW_RECIPE_OPT, t("＋ New recipe…"));
+  sel.value = b.recipeId || (b.recipeName ? b.recipeName : "");
+  if (!sel.value) sel.value = "";
+}
+
+/* 空いている欄だけ埋める。打ち込んだものを黙って上書きしない */
+function fillFromRecipe(r) {
+  const put = (id, value) => {
+    const node = $(id);
+    if (node.value === "" && value !== "" && value != null) node.value = value;
+  };
+  put("f-method", r.method || "");
+  put("f-grind", r.grind || "");
+  put("f-dose", r.doseG ?? "");
+  put("f-water", r.waterG ?? "");
+  put("f-temp", r.tempC ?? "");
+  put("f-time", r.totalSec ? fmtClock(r.totalSec) : "");
+  updateRatioReadout();
+}
+
+$("f-recipe").addEventListener("change", () => {
+  const sel = $("f-recipe");
+  const b = editingBrew;
+  if (!b) return;
+  if (sel.value === NEW_RECIPE_OPT) {
+    /* いま書いてあるものを持ったまま、レシピを書きに行く */
+    stashBrewForm();
+    sel.value = b.recipeId || "";
+    openRecipeEditor(null);
+    recipeReturn = true;
+    return;
+  }
+  if (!sel.value) { b.recipeId = ""; b.recipeName = ""; return; }
+  const r = findRecipe(sel.value);
+  if (!r) { b.recipeName = sel.options[sel.selectedIndex].textContent; return; }
+  b.recipeId = r.id;
+  b.recipeName = r.name;
+  fillFromRecipe(r);
+  toast(t("Filled in from “%s”", r.name));
+});
+
+/* 画面を離れるあいだ、打ちかけを editingBrew に預けておく */
+function stashBrewForm() {
+  const b = editingBrew;
+  if (!b) return;
+  b.brewedAt = fromLocalInput($("f-brewed-at").value);
+  b.bean = $("f-bean").value.trim();
+  b.roaster = $("f-roaster").value.trim();
+  b.roast = $("f-roast").value;
+  b.method = $("f-method").value.trim();
+  b.grind = $("f-grind").value;
+  b.grinder = $("f-grinder").value.trim();
+  b.doseG = num($("f-dose").value);
+  b.waterG = num($("f-water").value);
+  b.tempC = num($("f-temp").value);
+  b.timeSec = parseClock($("f-time").value);
+  b.notes = $("f-notes").value.trim();
+  b.next = $("f-next").value.trim();
+}
+
 function openBrewEditor(brew, { isNew }) {
   editingBrew = brew;
   editingIsNew = isNew;
   refreshSuggestLists();
-  $("brew-edit-title").textContent = isNew ? "Log a brew" : "Edit this brew";
+  $("brew-edit-title").textContent = t(isNew ? "Log a brew" : "Edit this brew");
   $("brew-delete").hidden = isNew;
 
   $("f-brewed-at").value = toLocalInput(brew.brewedAt);
@@ -2027,6 +3056,7 @@ function openBrewEditor(brew, { isNew }) {
   $("f-notes").value = brew.notes || "";
   $("f-next").value = brew.next || "";
   updateRatioReadout();
+  renderRecipeSelect();
   renderStarPicker();
   renderTasteSliders();
   renderFlavorChips();
@@ -2060,7 +3090,7 @@ function renderTasteSliders() {
   box.innerHTML = "";
   for (const [key, label] of TASTE_AXES) {
     const row = el("div", "taste-row");
-    row.appendChild(el("span", "taste-name", label));
+    row.appendChild(el("span", "taste-name", t(label)));
     const input = document.createElement("input");
     input.type = "range";
     input.min = "1"; input.max = "5"; input.step = "1";
@@ -2083,7 +3113,7 @@ function renderFlavorChips() {
   const chosen = editingBrew.flavors || [];
   const all = [...new Set([...FLAVOR_PRESETS, ...chosen])];
   for (const name of all) {
-    const chip = el("button", `chip${chosen.includes(name) ? " active" : ""}`, name);
+    const chip = el("button", `chip${chosen.includes(name) ? " active" : ""}`, t(name));
     chip.type = "button";
     chip.addEventListener("click", () => {
       const list = editingBrew.flavors || (editingBrew.flavors = []);
@@ -2123,8 +3153,14 @@ $("brew-save").addEventListener("click", async () => {
   b.timeSec = parseClock($("f-time").value);
   b.notes = $("f-notes").value.trim();
   b.next = $("f-next").value.trim();
+  const picked = $("f-recipe").value;
+  if (!picked) { b.recipeId = ""; b.recipeName = ""; }
+  else {
+    const r = findRecipe(picked);
+    if (r) { b.recipeId = r.id; b.recipeName = r.name; }
+  }
   await saveBrew(b);
-  toast(editingIsNew ? "Logged" : "Saved");
+  toast(t(editingIsNew ? "Logged" : "Saved"));
   renderHome();
   renderLog();
   /* 書き終えた記入欄は道に残さない。詳細から戻ると、元いた画面へ */
@@ -2132,9 +3168,9 @@ $("brew-save").addEventListener("click", async () => {
 });
 
 $("brew-delete").addEventListener("click", async () => {
-  if (!(await confirmAsk("Delete this brew? This cannot be undone."))) return;
+  if (!(await confirmAsk(t("Delete this brew? This cannot be undone.")))) return;
   await removeRecord("brews", editingBrew.id);
-  toast("Deleted");
+  toast(t("Deleted"));
   renderHome();
   renderLog();
   showScreen("log");
@@ -2146,7 +3182,7 @@ function renderRecipes() {
   box.innerHTML = "";
   const list = liveRecipes();
   if (!list.length) {
-    box.appendChild(el("p", "empty-note", "No recipes. Add one with the + above."));
+    box.appendChild(el("p", "empty-note", t("No recipes. Add one with the + above.")));
     return;
   }
   for (const r of list) box.appendChild(recipeCard(r, true));
@@ -2158,10 +3194,11 @@ let editingRecipe = null;
 let editingRecipeIsNew = false;
 
 function openRecipeEditor(id) {
+  recipeReturn = null;
   const found = id ? findRecipe(id) : null;
   editingRecipe = found ? JSON.parse(JSON.stringify(found)) : emptyRecipe();
   editingRecipeIsNew = !found;
-  $("recipe-edit-title").textContent = found ? "Edit recipe" : "New recipe";
+  $("recipe-edit-title").textContent = t(found ? "Edit recipe" : "New recipe");
   $("recipe-delete").hidden = !found;
   $("r-name").value = editingRecipe.name || "";
   $("r-method").value = editingRecipe.method || "";
@@ -2183,7 +3220,7 @@ function renderStepEditor() {
 
     const grid = el("div", "step-grid");
     const timeField = el("div", "field mini w-time");
-    timeField.innerHTML = '<label>At</label>';
+    timeField.innerHTML = `<label>${t("At")}</label>`;
     const timeInput = document.createElement("input");
     timeInput.type = "text";
     timeInput.inputMode = "numeric";
@@ -2197,7 +3234,7 @@ function renderStepEditor() {
     grid.appendChild(timeField);
 
     const kindField = el("div", "field mini w-kind");
-    kindField.innerHTML = '<label>Kind</label>';
+    kindField.innerHTML = `<label>${t("Kind")}</label>`;
     const kindSelect = document.createElement("select");
     for (const [value, label] of Object.entries(KIND_LABEL)) {
       const opt = document.createElement("option");
@@ -2214,7 +3251,7 @@ function renderStepEditor() {
     grid.appendChild(kindField);
 
     const waterField = el("div", "field mini w-water");
-    waterField.innerHTML = '<label>Total g</label>';
+    waterField.innerHTML = `<label>${t("Total g")}</label>`;
     const waterInput = document.createElement("input");
     waterInput.type = "number";
     waterInput.inputMode = "decimal";
@@ -2227,7 +3264,7 @@ function renderStepEditor() {
 
     const del = el("button", "step-del");
     del.type = "button";
-    del.setAttribute("aria-label", "Remove this step");
+    del.setAttribute("aria-label", t("Remove this step"));
     del.innerHTML = '<svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M6 6l12 12M18 6L6 18"/></svg>';
     del.addEventListener("click", () => {
       editingRecipe.steps.splice(i, 1);
@@ -2240,7 +3277,7 @@ function renderStepEditor() {
     labelField.style.marginBottom = "0";
     const labelInput = document.createElement("input");
     labelInput.type = "text";
-    labelInput.placeholder = step.kind === "pour" ? "e.g. Second pour" : "e.g. Break the crust";
+    labelInput.placeholder = t(step.kind === "pour" ? "e.g. Second pour" : "e.g. Break the crust");
     labelInput.value = step.label || "";
     labelInput.addEventListener("input", () => { step.label = labelInput.value; });
     labelField.appendChild(labelInput);
@@ -2284,7 +3321,7 @@ $("r-add-step").addEventListener("click", () => {
 
 $("recipe-save").addEventListener("click", async () => {
   const r = editingRecipe;
-  r.name = $("r-name").value.trim() || "Untitled recipe";
+  r.name = $("r-name").value.trim() || t("Untitled recipe");
   r.method = $("r-method").value.trim();
   r.grind = $("r-grind").value;
   r.doseG = num($("r-dose").value, 15);
@@ -2298,16 +3335,24 @@ $("recipe-save").addEventListener("click", async () => {
   /* 合計時間が手順より短いと、最後の手順が鳴る前に終わってしまう */
   r.totalSec = Math.max(parseClock($("r-total").value) ?? 0, lastAt);
   await saveRecipe(r);
-  toast(editingRecipeIsNew ? "Recipe created" : "Saved");
+  toast(t(editingRecipeIsNew ? "Recipe created" : "Saved"));
   renderRecipes();
   renderHome();
+  if (recipeReturn && editingBrew) {
+    recipeReturn = null;
+    editingBrew.recipeId = r.id;
+    editingBrew.recipeName = r.name;
+    openBrewEditor(editingBrew, { isNew: editingIsNew });
+    fillFromRecipe(r);
+    return;
+  }
   showScreen("recipes");
 });
 
 $("recipe-delete").addEventListener("click", async () => {
-  if (!(await confirmAsk("Delete this recipe? This cannot be undone."))) return;
+  if (!(await confirmAsk(t("Delete this recipe? This cannot be undone.")))) return;
   await removeRecord("recipes", editingRecipe.id);
-  toast("Deleted");
+  toast(t("Deleted"));
   renderRecipes();
   renderHome();
   showScreen("recipes");
@@ -2325,6 +3370,44 @@ function bindSwitch(id, key, after) {
   });
 }
 
+/* 言語は3つきり。開いて選ぶより、並べて押すほうが早い */
+function renderLangPicker() {
+  const box = $("s-lang");
+  box.innerHTML = "";
+  for (const l of LANGS) {
+    const b = el("button", "lang-chip" + (settings.lang === l.id ? " on" : ""), l.name);
+    b.type = "button";
+    b.lang = l.id;
+    b.setAttribute("aria-pressed", String(settings.lang === l.id));
+    b.addEventListener("click", async () => {
+      if (settings.lang === l.id) return;
+      settings.lang = l.id;
+      await saveSettings();
+      relang();
+    });
+    box.appendChild(b);
+  }
+}
+
+/* ことばを入れ替えたら、いま出ている札も、次に開く画面も、まとめて描き直す */
+function relang() {
+  applyLang();
+  renderLangPicker();
+  renderSettings();
+  renderHome();
+  renderLog();
+  renderRecipes();
+  if (editingBrew && $("screen-brew-edit").classList.contains("active")) renderRecipeSelect();
+  if (calMonth) renderCalendar();
+  /* 詳細は「いま出ているとき」だけ描き直す。開いてもいない画面へ
+     連れて行かれては、ことばを選んだだけのつもりが旅になる */
+  if (detailId && findBrew(detailId) && $("screen-brew-detail").classList.contains("active")) {
+    openBrewDetail(detailId, { replace: true });
+  }
+  renderTimerStatic();
+  renderTimerLive();
+}
+
 function renderSettings() {
   $("s-chime").checked = settings.chime;
   $("s-precue").checked = settings.precue;
@@ -2334,11 +3417,12 @@ function renderSettings() {
   $("s-volume").value = String(settings.volume);
   $("s-volume-out").textContent = `${settings.volume}%`;
   $("s-countdown").value = String(settings.countdown);
-  $("s-countdown-out").textContent = settings.countdown ? `${settings.countdown} s` : "off";
+  $("s-countdown-out").textContent = settings.countdown ? `${settings.countdown} s` : t("off");
   renderRoastPicker();
+  renderLangPicker();
   $("app-version").textContent = `v${APP_VERSION}`;
   $("s-data-note").textContent =
-    `On this device: ${plural(liveRecipes().length, "recipe")}, ${plural(liveBrews().length, "brew")}`;
+    t("On this device: %s, %s", counted(liveRecipes().length, "recipe"), counted(liveBrews().length, "brew"));
 }
 
 bindSwitch("s-chime", "chime", () => { syncMuteIcon(); if (timer.state === "running") scheduleUpcomingSounds(); });
@@ -2359,7 +3443,7 @@ $("s-volume").addEventListener("input", (e) => {
 $("s-volume").addEventListener("change", saveSettings);
 $("s-countdown").addEventListener("input", (e) => {
   settings.countdown = Number(e.target.value);
-  $("s-countdown-out").textContent = settings.countdown ? `${settings.countdown} s` : "off";
+  $("s-countdown-out").textContent = settings.countdown ? `${settings.countdown} s` : t("off");
 });
 $("s-countdown").addEventListener("change", saveSettings);
 $("s-test-chime").addEventListener("click", () => playSoundNow("step", 2));
@@ -2372,22 +3456,22 @@ function renderRoastPicker() {
   for (const roast of ROASTS) {
     const btn = el("button", `roast-swatch${roast.id === settings.roast ? " on" : ""}`);
     btn.type = "button";
-    btn.setAttribute("aria-label", roast.name);
+    btn.setAttribute("aria-label", t(roast.name));
     const dot = el("span", "roast-dot");
     dot.style.background = roast.hex;
     btn.appendChild(dot);
-    btn.appendChild(el("span", "roast-name", roast.name));
+    btn.appendChild(el("span", "roast-name", t(roast.name)));
     btn.addEventListener("click", async () => {
       settings.roast = roast.id;
       applyTheme();
       await saveSettings();
       renderRoastPicker();
-      toast(`${roast.name} roast it is`);
+      toast(t("%s roast it is", t(roast.name)));
     });
     box.appendChild(btn);
   }
   const note = $("s-roast-note");
-  if (note) note.textContent = `${findRoast(settings.roast).name} right now. The darker the bean, the deeper the accent.`;
+  if (note) note.textContent = t("%s right now. The darker the bean, the deeper the accent.", t(findRoast(settings.roast).name));
 }
 
 /* ---------- CSVで持ち出す ---------- *
@@ -2424,7 +3508,7 @@ function brewsCsv() {
     "Rating", "Acidity", "Sweetness", "Bitterness", "Body", "Aroma", "Flavours", "How it went", "Next time",
   ];
   const rows = liveBrews().slice().reverse().map((b) => [
-    fmtDateTime(b.brewedAt),
+    fmtStamp(b.brewedAt),
     b.bean, b.roaster, b.roast, b.method, b.grind, b.grinder,
     b.doseG ?? "", b.waterG ?? "",
     b.doseG && b.waterG ? ratioText(b.doseG, b.waterG) : "",
@@ -2461,26 +3545,26 @@ function recipesCsv() {
 
 $("s-export-csv").addEventListener("click", () => {
   const n = liveBrews().length;
-  if (!n) { toast("Nothing to export yet"); return; }
+  if (!n) { toast(t("Nothing to export yet")); return; }
   downloadFile(`coffeerence-records-${today()}.csv`, brewsCsv(), "text/csv;charset=utf-8");
-  toast(`${plural(n, "brew")} exported`);
+  toast(t("%s exported", counted(n, "brew")));
 });
 
 $("s-export-recipes-csv").addEventListener("click", () => {
   const n = liveRecipes().length;
-  if (!n) { toast("No recipes to export"); return; }
+  if (!n) { toast(t("No recipes to export")); return; }
   downloadFile(`coffeerence-recipes-${today()}.csv`, recipesCsv(), "text/csv;charset=utf-8");
-  toast(`${plural(n, "recipe")} exported`);
+  toast(t("%s exported", counted(n, "recipe")));
 });
 
 $("s-restore-recipes").addEventListener("click", async () => {
   const existing = new Set(liveRecipes().map((r) => r.name));
   const add = starterRecipes().filter((r) => !existing.has(r.name));
-  if (!add.length) { toast("They are all here already"); return; }
+  if (!add.length) { toast(t("They are all here already")); return; }
   recipes.push(...add);
   await idbPutMany("recipes", add);
   renderRecipes(); renderHome(); renderSettings();
-  toast(`${plural(add.length, "recipe")} put back`);
+  toast(t("%s put back", counted(add.length, "recipe")));
 });
 
 /* ------------------------------------------------------------------ *
@@ -2516,6 +3600,12 @@ window.addEventListener("beforeunload", (e) => {
 
 async function boot() {
   settings = { ...DEFAULT_SETTINGS, ...(await kvGet("settings", {})) };
+  /* 初めての人には、端末のことばに合わせて出しておく。合わなければ英語 */
+  if (!(await kvGet("settings", null))) {
+    const want = (navigator.language || "en").slice(0, 2);
+    if (LANGS.some((l) => l.id === want)) settings.lang = want;
+  }
+  applyLang();
   applyTheme();
   matchMedia("(prefers-color-scheme: dark)").addEventListener?.("change", () => {
     applyTheme();
@@ -2552,5 +3642,5 @@ boot().catch((err) => {
   console.error("起動に失敗しました:", err);
   document.body.innerHTML =
     '<p style="padding:40px;text-align:center;line-height:2;">'
-    + "Could not open the app.<br>Try reloading the page.</p>";
+    + t("Could not open the app.<br>Try reloading the page.") + "</p>";
 });
