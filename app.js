@@ -19,11 +19,11 @@
  *   8. 起動
  * ==================================================================== */
 
-const APP_VERSION = "2.11.0";
+const APP_VERSION = "2.12.0";
 
 /* ホームのロゴの下に #002 の形で出す、mainへマージした回数。
    マージのたびに1つ増やす（この見た目になるまでに何回積んだか） */
-const MERGE_COUNT = 35;
+const MERGE_COUNT = 36;
 
 /* ------------------------------------------------------------------ *
  * 1. 下ごしらえ
@@ -136,6 +136,94 @@ function confirmAsk(text) {
     backdrop.onclick = (e) => { if (e.target === backdrop) close(false); };
   });
 }
+
+/* はてなボタンの中身。画面ごとに、並んでいる順のまま項目を並べる。
+   専門語をいちいち外で調べさせないための、その場の脚注 */
+const HELP = {
+  log: {
+    title: "The log",
+    items: [
+      ["Search", "Looks through beans, roasters, brewers, flavour words and everything you typed in the notes."],
+      ["All / 4★ and up / This month", "Narrows the list below. 4★ and up is the shortcut back to the cups worth repeating."],
+      ["last 7 days", "How many brews you logged in the past seven days, today included."],
+      ["average rating", "The mean of the overall stars. Brews you left unrated are not counted."],
+      ["most used", "The brewer that turns up most often across everything below."],
+      ["The list", "Newest first, grouped by month. Tap a row to see the whole brew — the taste shape, the numbers, what you wrote."],
+      ["+ at the top", "Logs a brew by hand, for a cup you made without the timer."],
+    ],
+  },
+  brew: {
+    title: "Logging a brew",
+    items: [
+      ["Brewed at", "When you brewed it. Set to now when the form opens; change it if you are writing a cup up later."],
+      ["Coffee", "The beans. What you type here comes back as a suggestion next time."],
+      ["Roaster", "Who roasted them. Handy when the same origin tastes different from two shops."],
+      ["Roast", "How dark the roast is, Light through Dark. It also picks the colour the app uses for that brew."],
+      ["Brewer", "The gear the water went through — V60, Aeropress, french press, whatever it was."],
+      ["Grind", "How coarse you ground, in words. Fine for espresso, coarse for a french press."],
+      ["Grinder setting", "The actual number on your grinder, e.g. Comandante, 22 clicks. This is the one that lets you repeat a cup exactly."],
+      ["Dose (g)", "Dry coffee in grams, weighed before grinding."],
+      ["Water (g)", "All the water you poured in, in grams. 1 g is 1 ml."],
+      ["Temp (°C)", "Water temperature at the moment you poured. Lower is gentler on a dark roast."],
+      ["Brew time", "How long from the first drop of water to the last, as m:ss."],
+      ["Ratio", "Worked out for you from dose and water. 1:16 means 16 g of water per gram of coffee — around there is the usual place to start."],
+      ["Overall", "One to five stars, your own verdict. Nothing else in the app is calculated from it except the average."],
+      ["Acidity", "The bright, fruity edge — lemon, berry. 1 is flat, 5 is sharp."],
+      ["Sweetness", "Sugar, caramel, ripe fruit. Usually what comes back when the grind is right."],
+      ["Bitterness", "The dry, dark side. A high one often means too fine, too hot or too long."],
+      ["Body", "How heavy it feels in the mouth, from tea-like to syrupy."],
+      ["Aroma", "How much it gives off before you drink it."],
+      ["Flavour notes", "Tap the words that fit, or add your own. They come back in search."],
+      ["How was it?", "Free writing about the cup you actually drank."],
+      ["Next time", "The one change you want to make on the next go. Read it before you brew these beans again."],
+    ],
+  },
+  recipe: {
+    title: "Writing a recipe",
+    items: [
+      ["Name", "What you will pick it by on the home screen, e.g. Morning V60."],
+      ["Brewer", "The dripper or press this recipe is written for."],
+      ["Grind", "How coarse to grind for it."],
+      ["Dose (g)", "Dry coffee in grams."],
+      ["Water (g)", "The total water the recipe pours. Change this and every step below moves by the same proportion, so the shape of the recipe survives."],
+      ["Temp (°C)", "Water temperature to brew at."],
+      ["At", "When the step happens, counted from the start, as m:ss. The first one is usually 0:00."],
+      ["Kind", "What you do: Pour, Wait, Stir, Swirl, Press or Ready. Only Pour takes an amount of water."],
+      ["Total g", "The water you should have poured by the end of that step — cumulative, not the amount for that pour alone. So 60 then 150 means pour 60 g, then another 90 g."],
+      ["The line under each step", "A short label the timer shows while that step is running, e.g. Bloom or Circles from the middle out."],
+      ["Finished at (total time)", "When the whole brew is done. The timer rings its last chime here."],
+      ["Notes", "Anything about the recipe itself — where it came from, what to watch for."],
+    ],
+  },
+};
+
+/* 説明の紙。confirmAsk と同じ下から出る紙を使い回す */
+function openHelp(which) {
+  const help = HELP[which];
+  if (!help) return;
+  const backdrop = $("help-backdrop");
+  $("help-title").textContent = help.title;
+  const list = $("help-list");
+  list.innerHTML = "";
+  for (const [term, desc] of help.items) {
+    list.appendChild(el("dt", "help-term", term));
+    list.appendChild(el("dd", "help-desc", desc));
+  }
+  list.scrollTop = 0;
+  backdrop.hidden = false;
+  const close = () => {
+    backdrop.hidden = true;
+    $("help-close").onclick = null;
+    backdrop.onclick = null;
+  };
+  $("help-close").onclick = close;
+  backdrop.onclick = (e) => { if (e.target === backdrop) close(); };
+}
+
+document.addEventListener("click", (e) => {
+  const btn = e.target.closest("[data-help]");
+  if (btn) openHelp(btn.dataset.help);
+});
 
 /* ------------------------------------------------------------------ *
  * 2. IndexedDB

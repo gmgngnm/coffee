@@ -118,6 +118,7 @@
       <button class="icon-btn" data-back type="button" aria-label="Back"><svg class="icon-svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M15 18l-6-6 6-6"/></svg></button>
       <h1 class="screen-title">Log</h1>
       <div class="nav-icons">
+        <button class="icon-btn" data-help="log" type="button" title="What each field means" aria-label="What each field means"><svg class="icon-svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="12" r="9"/><path d="M9.6 9.2a2.5 2.5 0 0 1 4.8.8c0 1.7-2.4 2-2.4 3.5"/><path d="M12 17.2h.01"/></svg></button>
         <button class="icon-btn" id="log-add-btn" type="button" title="Add a brew" aria-label="Add a brew"><svg class="icon-svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" aria-hidden="true"><path d="M12 5v14M5 12h14"/></svg></button>
       </div>
     </div>
@@ -155,6 +156,7 @@
       <button class="icon-btn" data-back type="button" aria-label="Back"><svg class="icon-svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M15 18l-6-6 6-6"/></svg></button>
       <h1 class="screen-title" id="brew-edit-title">Log a brew</h1>
       <div class="nav-icons">
+        <button class="icon-btn" data-help="brew" type="button" title="What each field means" aria-label="What each field means"><svg class="icon-svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="12" r="9"/><path d="M9.6 9.2a2.5 2.5 0 0 1 4.8.8c0 1.7-2.4 2-2.4 3.5"/><path d="M12 17.2h.01"/></svg></button>
         <button class="text-btn strong" id="brew-save" type="button">Save</button>
       </div>
     </div>
@@ -294,6 +296,7 @@
       <button class="icon-btn" data-back type="button" aria-label="Back"><svg class="icon-svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M15 18l-6-6 6-6"/></svg></button>
       <h1 class="screen-title" id="recipe-edit-title">Recipe</h1>
       <div class="nav-icons">
+        <button class="icon-btn" data-help="recipe" type="button" title="What each field means" aria-label="What each field means"><svg class="icon-svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="12" r="9"/><path d="M9.6 9.2a2.5 2.5 0 0 1 4.8.8c0 1.7-2.4 2-2.4 3.5"/><path d="M12 17.2h.01"/></svg></button>
         <button class="text-btn strong" id="recipe-save" type="button">Save</button>
       </div>
     </div>
@@ -431,6 +434,15 @@
   </section>
 
   <div class="toast" id="toast" hidden></div>
+  <div class="sheet-backdrop" id="help-backdrop" hidden>
+    <div class="sheet help-sheet" role="dialog" aria-modal="true" aria-labelledby="help-title">
+      <h2 class="sheet-title" id="help-title">What each field means</h2>
+      <dl class="help-list" id="help-list"></dl>
+      <div class="sheet-btns">
+        <button class="ctrl-btn secondary" id="help-close" type="button">Got it</button>
+      </div>
+    </div>
+  </div>
   <div class="sheet-backdrop" id="confirm-backdrop" hidden>
     <div class="sheet" role="dialog" aria-modal="true">
       <p class="sheet-text" id="confirm-text"></p>

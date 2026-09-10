@@ -564,6 +564,29 @@ input[type="range"]::-moz-range-thumb{
 @keyframes sheetIn{from{opacity:0;transform:translateY(14px);}to{opacity:1;transform:none;}}
 .sheet-text{font-size:14.5px;line-height:1.8;margin:0 0 18px;}
 .sheet-btns{display:flex;gap:10px;}
+.sheet-title{
+  font-size:16px;font-weight:600;letter-spacing:.01em;
+  margin:0 0 12px;color:var(--ink);
+}
+/* 説明はいくらでも長くなるので、紙の中だけを転がす。
+   画面の高さは測らない（測ると iOS で狂う）ので dvh ではなく比率で */
+.help-sheet{max-height:78vh;display:flex;flex-direction:column;}
+.help-list{
+  margin:0 0 16px;overflow-y:auto;-webkit-overflow-scrolling:touch;
+  overscroll-behavior:contain;padding-right:2px;
+}
+.help-term{
+  font-size:13px;font-weight:600;color:var(--ink);
+  letter-spacing:.02em;margin:0;
+}
+.help-desc{
+  font-size:13.5px;line-height:1.72;color:var(--ink-soft);
+  margin:2px 0 14px;
+}
+.help-desc:last-child{margin-bottom:2px;}
+/* 転がる文と閉じるボタンのあいだに一本。ここで切れているのではなく
+   まだ下に続く、と目に言う */
+.help-sheet .sheet-btns{border-top:1px solid var(--line);padding-top:14px;}
 
 @media (min-width:481px){
   #app{border-left:1px solid var(--line);border-right:1px solid var(--line);}
