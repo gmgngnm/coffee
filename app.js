@@ -19,11 +19,11 @@
  *   8. 起動
  * ==================================================================== */
 
-const APP_VERSION = "2.14.0";
+const APP_VERSION = "2.14.1";
 
 /* ホームのロゴの下に #002 の形で出す、mainへマージした回数。
    マージのたびに1つ増やす（この見た目になるまでに何回積んだか） */
-const MERGE_COUNT = 38;
+const MERGE_COUNT = 39;
 
 /* ------------------------------------------------------------------ *
  * 1. 下ごしらえ
@@ -1426,6 +1426,15 @@ function starterRecipes() {
  * ------------------------------------------------------------------ */
 const CLOUD_TABLES = { recipes: "recipes", brews: "brews" };
 
+/* このアプリが最初から向いている先。publishable キーはブラウザに置く前提の
+   もので（Supabaseの画面にも "can be safely shared publicly" とある）、
+   これだけでは誰の一杯も読めない。守っているのは表側の row-level security。
+   別のプロジェクトを使いたい人は、設定の同期から上書きできる */
+const CLOUD_DEFAULT = {
+  url: "https://ahnkfaouaexplcyolluq.supabase.co",
+  key: "sb_publishable_-1O6iPxni6W0jSpKETBKNw_hJci9-K9",
+};
+
 const cloud = {
   url: "",            // https://xxxx.supabase.co
   key: "",            // anon key（公開してよい鍵。守るのはRLS）
@@ -1441,13 +1450,18 @@ const cloud = {
 const cloudConfigured = () => Boolean(cloud.url && cloud.key);
 const cloudOn = () => cloudConfigured() && Boolean(cloud.token && cloud.user);
 
+/* apikey はどのプロジェクトに話しかけているかを言うだけ。誰として話すかを
+   決めるのは Authorization のほう。入る前は付けない——新方式の
+   publishable キー（sb_publishable_…）は JWT ではないので、人の札の
+   代わりには使えない */
 function cloudHeaders(extra = {}) {
-  return {
+  const h = {
     apikey: cloud.key,
-    Authorization: `Bearer ${cloud.token || cloud.key}`,
     "Content-Type": "application/json",
     ...extra,
   };
+  if (cloud.token) h.Authorization = `Bearer ${cloud.token}`;
+  return h;
 }
 
 /* ---------- 鍵と札のしまい場所 ---------- *
@@ -1455,7 +1469,10 @@ function cloudHeaders(extra = {}) {
  *  鶏と卵になる。ここだけは端末のものとして kv に置く
  * ------------------------------------------------------------------ */
 async function loadCloudConfig() {
-  const conf = await kvGet("cloud", {});
+  /* 一度も設定を触っていない人には既定の繋ぎ先を。自分で欄を空にして
+     同期を切った人に、それを勝手に戻したりはしない */
+  const saved = await kvGet("cloud", null);
+  const conf = saved || CLOUD_DEFAULT;
   cloud.url = (conf.url || "").replace(/\/+$/, "");
   cloud.key = conf.key || "";
   cloud.token = conf.token || "";
