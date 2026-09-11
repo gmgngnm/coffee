@@ -19,11 +19,11 @@
  *   8. 起動
  * ==================================================================== */
 
-const APP_VERSION = "2.16.0";
+const APP_VERSION = "2.17.0";
 
 /* ホームのロゴの下に #002 の形で出す、mainへマージした回数。
    マージのたびに1つ増やす（この見た目になるまでに何回積んだか） */
-const MERGE_COUNT = 42;
+const MERGE_COUNT = 43;
 
 /* ------------------------------------------------------------------ *
  * 1. 下ごしらえ
@@ -434,28 +434,10 @@ const DICT = {
     "200 g water over 100 g ice. Brew it strong, chill it fast.": "氷100 gに湯200 g。濃く淹れて、一気に冷やす。",
     "Sync":
       "同期",
-    "Off by default. Point it at your own Supabase project and everything you log goes there too, so a second device sees the same cups.":
-      "はじめは切ってあります。自分のSupabaseプロジェクトを指すと、記録したものがそちらにも置かれ、2台目でも同じ一杯が見られます。",
-    "Project URL":
-      "プロジェクトのURL",
-    "Anon key":
-      "anonキー",
-    "Save and check":
-      "保存して確かめる",
-    "How to set it up":
-      "つなぎかた",
-    "Not connected. Everything stays on this device.":
-      "つないでいません。すべてこの端末の中だけにあります。",
     "Syncing…":
       "合わせています…",
-    "Signed in as %s":
-      "%s で入っています",
-    "last synced %s":
-      "最後に合わせたのは %s",
     "%s waiting to go up":
       "上がるのを待っているもの %s件",
-    "Project set. Sign in to start syncing.":
-      "プロジェクトは設定済み。入ると同期が始まります。",
     "Sign in with Google":
       "Googleで入る",
     "Sync now":
@@ -468,50 +450,6 @@ const DICT = {
       "入りました",
     "Signed out — please sign in again":
       "出ました。もう一度入ってください",
-    "Upload everything on this device":
-      "この端末のものを全部あげる",
-    "Send every recipe and brew on this device up to the project?":
-      "この端末のレシピと記録を全部、プロジェクトへ送りますか？",
-    "Sent up":
-      "送りました",
-    "Sync turned off":
-      "同期を切りました",
-    "Project reached":
-      "プロジェクトに届きました",
-    "That does not look like a project URL.":
-      "プロジェクトのURLに見えません。",
-    "Could not reach it (%s)":
-      "届きませんでした（%s）",
-    "Setting up sync":
-      "同期のつなぎかた",
-    "1. Make a project":
-      "1. プロジェクトを作る",
-    "Sign up at supabase.com and create a project. It is free for what this app needs.":
-      "supabase.com で登録して、プロジェクトを1つ作ります。このアプリが使うぶんなら無料の枠で足ります。",
-    "2. Make the tables":
-      "2. 表を作る",
-    "Open the SQL editor in your project and run the block in SETUP.md in this app's repository. It makes three tables (recipes, brews, prefs) and locks each row to its owner.":
-      "プロジェクトのSQLエディタを開き、このアプリのリポジトリにある SETUP.md の一塊をそのまま流します。3つの表（recipes・brews・prefs）ができ、行ごとに持ち主の鍵がかかります。",
-    "3. Turn on Google":
-      "3. Googleを開ける",
-    "It asks for a client ID and secret from Google Cloud, and gives you a callback URL to paste back into Google.":
-      "Google CloudのクライアントIDとシークレットを訊かれ、代わりにGoogle側へ貼る Callback URL をくれます。",
-    "In the project, Authentication → Providers → Google. It asks for a client ID and secret from Google Cloud, and gives you a callback URL to paste back into Google.":
-      "プロジェクトの Authentication → Providers → Google。Google CloudのクライアントIDとシークレットを訊かれ、代わりにGoogle側へ貼る Callback URL をくれます。",
-    "4. Allow this address":
-      "4. この住所を通す",
-    "Authentication → URL Configuration → Redirect URLs. Add the address this app is served from — the one in your browser's bar, without the # part.":
-      "Authentication → URL Configuration → Redirect URLs に、このアプリを開いている住所を足します。ブラウザのアドレス欄にあるもの（# から後ろは要りません）。",
-    "5. Paste the two lines":
-      "5. 2行を貼る",
-    "Project Settings → API. Copy the Project URL and the anon public key into the two fields above, then press Save and check.":
-      "Project Settings → API から Project URL と anon public キーを写して、上の2つの欄に貼り、「保存して確かめる」を押します。",
-    "Is the anon key a secret?":
-      "anonキーは秘密？",
-    "No. It is meant to be public — it only says which project you are talking to. What keeps your cups yours is the row-level security in step 2, which ties every row to the account that wrote it.":
-      "いいえ。公開してよい鍵です。どのプロジェクトに話しかけているかを言うだけのもの。あなたの一杯を守っているのは、手順2の row-level security（行ごとの壁）で、書いた本人の行しか触れません。",
-    "Once the project answers, the button appears. After signing in, use “Upload everything on this device” once, so what you already have goes up.":
-      "プロジェクトが応えると、ボタンが出ます。入ったら一度だけ「この端末のものを全部あげる」を押してください。いまあるものがまるごと上がります。",
     "Your cups live on this device and in your own Supabase project — nowhere else. CSV opens in a spreadsheet — one row per brew, one row per recipe.":
       "あなたの一杯は、この端末と、あなた自身のSupabaseプロジェクトの中だけにあります。CSVは表計算で開けます。1杯1行、1レシピ1行。",
     "Sign in and your cups follow you to every device.":
@@ -525,6 +463,11 @@ const DICT = {
     "Marimba": "マリンバ",
     "Wood": "ウッド",
     "Digital": "電子",
+    "Synced · %s": "同期済み · %s",
+    "Could not sync":
+      "同期できませんでした",
+    "No connection. It will catch up by itself.":
+      "つながっていません。繋がり次第ひとりでに追いつきます。",
     "Search": "さがす",
   },
   de: {
@@ -869,28 +812,10 @@ const DICT = {
     "200 g water over 100 g ice. Brew it strong, chill it fast.": "200 g Wasser auf 100 g Eis. Stark brühen, schnell kühlen.",
     "Sync":
       "Sync",
-    "Off by default. Point it at your own Supabase project and everything you log goes there too, so a second device sees the same cups.":
-      "Standardmäßig aus. Richte es auf dein eigenes Supabase-Projekt, dann landet alles Eingetragene auch dort — und ein zweites Gerät sieht dieselben Tassen.",
-    "Project URL":
-      "Projekt-URL",
-    "Anon key":
-      "Anon-Key",
-    "Save and check":
-      "Sichern und prüfen",
-    "How to set it up":
-      "So richtest du es ein",
-    "Not connected. Everything stays on this device.":
-      "Nicht verbunden. Alles bleibt auf diesem Gerät.",
     "Syncing…":
       "Wird abgeglichen …",
-    "Signed in as %s":
-      "Angemeldet als %s",
-    "last synced %s":
-      "zuletzt abgeglichen %s",
     "%s waiting to go up":
       "%s warten auf den Upload",
-    "Project set. Sign in to start syncing.":
-      "Projekt gesetzt. Melde dich an, um abzugleichen.",
     "Sign in with Google":
       "Mit Google anmelden",
     "Sync now":
@@ -903,48 +828,6 @@ const DICT = {
       "Angemeldet",
     "Signed out — please sign in again":
       "Abgemeldet — bitte neu anmelden",
-    "Upload everything on this device":
-      "Alles von diesem Gerät hochladen",
-    "Send every recipe and brew on this device up to the project?":
-      "Jedes Rezept und jede Tasse von diesem Gerät ins Projekt schicken?",
-    "Sent up":
-      "Hochgeladen",
-    "Sync turned off":
-      "Sync ausgeschaltet",
-    "Project reached":
-      "Projekt erreicht",
-    "That does not look like a project URL.":
-      "Das sieht nicht nach einer Projekt-URL aus.",
-    "Could not reach it (%s)":
-      "Nicht erreichbar (%s)",
-    "Setting up sync":
-      "Sync einrichten",
-    "1. Make a project":
-      "1. Projekt anlegen",
-    "Sign up at supabase.com and create a project. It is free for what this app needs.":
-      "Melde dich auf supabase.com an und lege ein Projekt an. Für das, was diese App braucht, reicht der kostenlose Rahmen.",
-    "2. Make the tables":
-      "2. Tabellen anlegen",
-    "Open the SQL editor in your project and run the block in SETUP.md in this app's repository. It makes three tables (recipes, brews, prefs) and locks each row to its owner.":
-      "Öffne den SQL-Editor im Projekt und führ den Block aus SETUP.md im Repository dieser App aus. Er legt drei Tabellen an (recipes, brews, prefs) und bindet jede Zeile an ihren Besitzer.",
-    "3. Turn on Google":
-      "3. Google freischalten",
-    "In the project, Authentication → Providers → Google. It asks for a client ID and secret from Google Cloud, and gives you a callback URL to paste back into Google.":
-      "Im Projekt: Authentication → Providers → Google. Es fragt nach Client-ID und Secret aus der Google Cloud und gibt dir dafür eine Callback-URL, die zurück zu Google gehört.",
-    "4. Allow this address":
-      "4. Diese Adresse zulassen",
-    "Authentication → URL Configuration → Redirect URLs. Add the address this app is served from — the one in your browser's bar, without the # part.":
-      "Authentication → URL Configuration → Redirect URLs. Trag die Adresse ein, unter der diese App läuft — die aus der Adressleiste, ohne den Teil ab #.",
-    "5. Paste the two lines":
-      "5. Die zwei Zeilen einsetzen",
-    "Project Settings → API. Copy the Project URL and the anon public key into the two fields above, then press Save and check.":
-      "Project Settings → API. Kopier die Projekt-URL und den anon-public-Key in die zwei Felder oben und drück auf Sichern und prüfen.",
-    "Is the anon key a secret?":
-      "Ist der Anon-Key geheim?",
-    "No. It is meant to be public — it only says which project you are talking to. What keeps your cups yours is the row-level security in step 2, which ties every row to the account that wrote it.":
-      "Nein. Er ist für die Öffentlichkeit gedacht — er sagt nur, mit welchem Projekt du sprichst. Deine Tassen schützt die Row-Level-Security aus Schritt 2, die jede Zeile an das Konto bindet, das sie geschrieben hat.",
-    "Once the project answers, the button appears. After signing in, use “Upload everything on this device” once, so what you already have goes up.":
-      "Sobald das Projekt antwortet, erscheint der Knopf. Nach der Anmeldung einmal „Alles von diesem Gerät hochladen“ drücken, damit das Vorhandene nach oben geht.",
     "Your cups live on this device and in your own Supabase project — nowhere else. CSV opens in a spreadsheet — one row per brew, one row per recipe.":
       "Deine Tassen liegen auf diesem Gerät und in deinem eigenen Supabase-Projekt — sonst nirgends. CSV öffnet sich in der Tabelle — eine Zeile je Tasse, eine je Rezept.",
     "Sign in and your cups follow you to every device.":
@@ -958,6 +841,11 @@ const DICT = {
     "Marimba": "Marimba",
     "Wood": "Holz",
     "Digital": "Digital",
+    "Synced · %s": "Abgeglichen · %s",
+    "Could not sync":
+      "Abgleich fehlgeschlagen",
+    "No connection. It will catch up by itself.":
+      "Keine Verbindung. Holt von selbst auf, sobald wieder da.",
     "Search": "Suche",
   },
 };
@@ -1043,6 +931,17 @@ function fmtMonthYear(d) {
 function fmtDayLong(ms) {
   return dateFmt({ weekday: "long", day: "numeric", month: "long" }).format(new Date(ms));
 }
+/* 「いつ合わせたか」は、たいてい数分前のこと。今日なら時刻だけでいい。
+   毎回そこに年月日を置くと、札の中で2行に折り返してしまう */
+function fmtSyncTime(ms) {
+  const d = new Date(ms), now = new Date();
+  const sameDay = d.getFullYear() === now.getFullYear()
+    && d.getMonth() === now.getMonth() && d.getDate() === now.getDate();
+  return dateFmt(sameDay
+    ? { hour: "2-digit", minute: "2-digit" }
+    : { month: "short", day: "numeric", hour: "2-digit", minute: "2-digit" }).format(d);
+}
+
 /* 表計算に渡す欄だけは、言語に関わらず読み方の変わらない形にしておく */
 function fmtStamp(ms) {
   const d = new Date(ms);
@@ -1149,18 +1048,6 @@ const HELP = {
       ["Tapping a day", "Tap a day to see what you brewed then."],
       ["‹ and ›", "Move a month back or forward. It stops at this month — the future has no coffee in it yet."],
       ["The line under the grid", "How many cups this month, over how many days, and the busiest single day."],
-    ],
-  },
-  cloud: {
-    title: "Setting up sync",
-    items: [
-      ["1. Make a project", "Sign up at supabase.com and create a project. It is free for what this app needs."],
-      ["2. Make the tables", "Open the SQL editor in your project and run the block in SETUP.md in this app's repository. It makes three tables (recipes, brews, prefs) and locks each row to its owner."],
-      ["3. Turn on Google", "In the project, Authentication → Providers → Google. It asks for a client ID and secret from Google Cloud, and gives you a callback URL to paste back into Google."],
-      ["4. Allow this address", "Authentication → URL Configuration → Redirect URLs. Add the address this app is served from — the one in your browser's bar, without the # part."],
-      ["5. Paste the two lines", "Project Settings → API. Copy the Project URL and the anon public key into the two fields above, then press Save and check."],
-      ["Is the anon key a secret?", "No. It is meant to be public — it only says which project you are talking to. What keeps your cups yours is the row-level security in step 2, which ties every row to the account that wrote it."],
-      ["Sign in with Google", "Once the project answers, the button appears. After signing in, use “Upload everything on this device” once, so what you already have goes up."],
     ],
   },
   recipe: {
@@ -1471,6 +1358,7 @@ const cloud = {
   state: "off",       // off | ready | signed | syncing | error
   note: "",           // 直近の言い分
   pulledAt: 0,
+  lastPull: { recipes: 0, brews: 0 },
 };
 
 const cloudConfigured = () => Boolean(cloud.url && cloud.key);
@@ -1495,12 +1383,10 @@ function cloudHeaders(extra = {}) {
  *  鶏と卵になる。ここだけは端末のものとして kv に置く
  * ------------------------------------------------------------------ */
 async function loadCloudConfig() {
-  /* 一度も設定を触っていない人には既定の繋ぎ先を。自分で欄を空にして
-     同期を切った人に、それを勝手に戻したりはしない */
-  const saved = await kvGet("cloud", null);
-  const conf = saved || CLOUD_DEFAULT;
-  cloud.url = (conf.url || "").replace(/\/+$/, "");
-  cloud.key = conf.key || "";
+  /* 繋ぎ先はアプリに焼き込んである。しまっておくのは、入った人の札だけ */
+  const conf = await kvGet("cloud", {});
+  cloud.url = CLOUD_DEFAULT.url.replace(/\/+$/, "");
+  cloud.key = CLOUD_DEFAULT.key;
   cloud.token = conf.token || "";
   cloud.refresh = conf.refresh || "";
   cloud.expires = conf.expires || 0;
@@ -1511,7 +1397,7 @@ async function loadCloudConfig() {
 
 async function saveCloudConfig() {
   await kvSet("cloud", {
-    url: cloud.url, key: cloud.key, token: cloud.token, refresh: cloud.refresh,
+    token: cloud.token, refresh: cloud.refresh,
     expires: cloud.expires, user: cloud.user, pulledAt: cloud.pulledAt,
   });
 }
@@ -1733,6 +1619,7 @@ async function cloudPull({ full = false } = {}) {
       return put.length;
     };
     const n = (await merge("recipes", rRows, recipes)) + (await merge("brews", bRows, brews));
+    cloud.lastPull = { recipes: rRows.length, brews: bRows.length };
 
     /* 設定は1人1行。向こうが新しければ、そちらに合わせる */
     const pref = pRows[0];
@@ -1764,15 +1651,25 @@ async function cloudPull({ full = false } = {}) {
   }
 }
 
-/* いま端末にあるものを、まるごと向こうへ。初めて繋いだときの一度きり */
-async function cloudPushEverything() {
+/* 初めて入ったときの一度きり。まず向こうに合わせ、そのうえで、この端末に
+   あって向こうに無いものを押し上げる。
+   向こうにすでにレシピがあるなら、最初から入っていた5つは送らない。
+   端末ごとに別のidで焼かれているので、送ると同じものが二重に並ぶ */
+async function cloudFirstSync() {
+  if (!(await cloudPull({ full: true }))) return;
+  await cloudPushEverything({ skipStarters: cloud.lastPull.recipes > 0 });
+}
+
+/* いま端末にあるものを、まるごと向こうへ */
+async function cloudPushEverything({ skipStarters = false } = {}) {
   if (!cloudOn()) return false;
   if (!(await ensureFreshToken())) return false;
   cloud.state = "syncing";
   renderCloudPanel();
   try {
     for (const [store, table] of Object.entries(CLOUD_TABLES)) {
-      const list = store === "recipes" ? recipes : brews;
+      let list = store === "recipes" ? recipes : brews;
+      if (skipStarters && store === "recipes") list = list.filter((r) => !r.starter);
       /* PostgREST の一度の受けは大きくない。100行ずつ渡す */
       for (let i = 0; i < list.length; i += 100) {
         await cloudUpsert(table, list.slice(i, i + 100).map(toRow));
@@ -1798,7 +1695,7 @@ window.addEventListener("hashchange", async () => {
   if (await catchAuthRedirect()) {
     renderCloudPanel();
     await flushOutbox();
-    await cloudPull({ full: true });
+    await cloudFirstSync();
     renderHome();
     toast(t("Signed in"));
   } else renderCloudPanel();
@@ -1893,10 +1790,10 @@ function voiceAt(voice, when, base, dur, gain) {
      終わり … チーーン（低く、長く伸ばす）
    注ぐ以外の手順（混ぜる・押すなど）は1回。
    kind: "step" / "finish" / "cue"（予告） */
-/* 素の高さ。合図は A6、予告はそのすこし上の C7。設定の半音で動かす。
+/* 素の高さ。合図は G6、予告はそのすこし上の C7。設定の半音で動かす。
    淹れ終わりは、合図の1オクターブ上にいつも付いていく */
-const TONE_STEP = 1760;
-const TONE_CUE = 2093;
+const TONE_STEP = 1568;   // G6
+const TONE_CUE = 2093;    // C7
 
 const chimeFreq = () => pitched(TONE_STEP, settings.chimePitch);
 const cueFreq = () => pitched(TONE_CUE, settings.cuePitch);
@@ -1905,12 +1802,13 @@ function scheduleSound(kind, when, count = 1) {
   if (!ensureAudio()) return;
   const v = volumeGain();
   if (v <= 0) return;
-  if (kind === "cue") { voiceAt(settings.cueVoice, when, cueFreq(), 0.4, 0.08 * v); return; }
+  if (kind === "cue") { voiceAt(settings.cueVoice, when, cueFreq(), 0.7, 0.08 * v); return; }
   /* 高い音は耳に刺さりやすいので、長く伸ばすぶん少し弱める */
-  if (kind === "finish") { voiceAt(settings.chimeVoice, when, chimeFreq() * 2, 3.6, 0.24 * v); return; }
-  /* 数えられる速さで、かつ間延びしない間隔 */
+  if (kind === "finish") { voiceAt(settings.chimeVoice, when, chimeFreq() * 2, 5.2, 0.24 * v); return; }
+  /* 数えられる速さで、かつ間延びしない間隔。余韻は次の一打に重なるが、
+     立ち上がりが鋭いので、重なっても打数は数えられる */
   for (let i = 0; i < Math.max(1, count); i++) {
-    voiceAt(settings.chimeVoice, when + i * 0.26, chimeFreq(), 0.8, 0.26 * v);
+    voiceAt(settings.chimeVoice, when + i * 0.26, chimeFreq(), 1.4, 0.26 * v);
   }
 }
 
@@ -3969,103 +3867,54 @@ $("recipe-delete").addEventListener("click", async () => {
 $("free-timer-btn").addEventListener("click", () => openTimer(null));
 
 /* ---------- 設定 ---------- */
-/* ---------- 雲の設定 ---------- */
-/* Google の印つきのボタン。見慣れた形でないと「ログインできる」と
-   気づいてもらえないので、白地と4色の印はそのまま使う */
-/* 入口は設定の頭にひとつだけ。入っていれば消える */
+/* ---------- 繋がりの札 ---------- *
+ *  繋ぎ先はアプリに焼き込んであるので、URLも鍵も見せない。使う人から
+ *  見えるのは「誰として入っているか」と「いつ合わせたか」だけでいい
+ * ------------------------------------------------------------------ */
 function renderSigninCard() {
   const card = $("settings-signin");
-  if (!card) return;
-  card.hidden = !(cloudConfigured() && !cloudOn());
-}
+  const acct = $("settings-account");
+  if (!card || !acct) return;
+  const on = cloudOn();
+  card.hidden = on;
+  acct.hidden = !on;
+  if (!on) return;
 
-/* 欄へ書き戻すのは、開いたときと、しまえたときだけ。様子を描き直す
-   たびに書き戻すと、打ちかけの鍵が消える */
-function fillCloudFields() {
-  if (!$("s-cloud-url")) return;
-  $("s-cloud-url").value = cloud.url;
-  $("s-cloud-key").value = cloud.key;
-}
-
-function renderCloudPanel() {
-  renderSigninCard();
-  const line = $("s-cloud-state");
-  const btns = $("s-cloud-btns");
-  if (!line || !btns) return;
+  $("account-mail").textContent = cloud.user.email || cloud.user.id;
 
   const pending = outbox.recipes.length + outbox.brews.length + (outbox.prefs ? 1 : 0);
+  const bad = cloud.state === "error";
   let text;
-  if (!cloudConfigured()) text = t("Not connected. Everything stays on this device.");
+  if (bad) text = niceError(cloud.note);
   else if (cloud.state === "syncing") text = t("Syncing…");
-  else if (cloudOn()) {
-    text = t("Signed in as %s", cloud.user.email || cloud.user.id);
-    if (cloud.pulledAt) text += ` · ${t("last synced %s", fmtDateTime(cloud.pulledAt))}`;
-    if (pending) text += ` · ${t("%s waiting to go up", pending)}`;
-  } else text = t("Project set. Sign in to start syncing.");
-  if (cloud.note) text += ` · ${cloud.note}`;
+  /* 送りそこねたぶんがあるなら、しくじりの文面より「まだ上がっていない」
+     と言うほうが親切。繋がり次第ひとりでに流れるので、することは無い */
+  else if (pending) text = t("%s waiting to go up", pending);
+  else if (cloud.pulledAt) text = t("Synced · %s", fmtSyncTime(cloud.pulledAt));
+  else text = t("Signed in");
+  const line = $("account-state");
   line.textContent = text;
-  line.classList.toggle("bad", cloud.state === "error");
-
-  btns.innerHTML = "";
-  const add = (label, cls, fn) => {
-    const b = el("button", `wide-btn ${cls}`, label);
-    b.type = "button";
-    b.addEventListener("click", fn);
-    btns.appendChild(b);
-    return b;
-  };
-  if (!cloudConfigured()) return;
-  /* 入る前のボタンは、この画面の頭にある札のほう。ここでは出さない */
-  if (!cloudOn()) return;
-  const pair = el("div", "btn-pair");
-  btns.appendChild(pair);
-  const inPair = (label, fn) => {
-    const b = el("button", "wide-btn ghost", label);
-    b.type = "button";
-    b.addEventListener("click", fn);
-    pair.appendChild(b);
-  };
-  inPair(t("Sync now"), async () => { await flushOutbox(); await cloudPull(); toast(t("Synced")); });
-  inPair(t("Sign out"), cloudSignOut);
-  const up = el("button", "wide-btn ghost", t("Upload everything on this device"));
-  up.type = "button";
-  up.addEventListener("click", async () => {
-    if (!(await confirmAsk(t("Send every recipe and brew on this device up to the project?")))) return;
-    if (await cloudPushEverything()) toast(t("Sent up"));
-  });
-  btns.appendChild(up);
+  line.classList.toggle("bad", bad);
 }
 
-$("settings-google").addEventListener("click", cloudSignIn);
+/* fetch のしくじりは端末とブラウザで言い回しがばらばらなうえ、英語で
+   返ってくる。線が無いだけのときは、こちらの言葉で言い直す */
+function niceError(note) {
+  if (!note) return t("Could not sync");
+  if (/failed to fetch|networkerror|load failed|network request failed/i.test(note)) {
+    return t("No connection. It will catch up by itself.");
+  }
+  return note;
+}
 
-$("s-cloud-save").addEventListener("click", async () => {
-  const url = $("s-cloud-url").value.trim().replace(/\/+$/, "");
-  const key = $("s-cloud-key").value.trim();
-  if (url && !/^https:\/\/[^\s/]+$/.test(url)) {
-    cloud.state = "error";
-    cloud.note = t("That does not look like a project URL.");
-    renderCloudPanel();
-    $("s-cloud-url").focus();
-    return;
-  }
-  const changed = url !== cloud.url || key !== cloud.key;
-  cloud.url = url; cloud.key = key;
-  if (changed) { cloud.token = ""; cloud.refresh = ""; cloud.user = null; cloud.pulledAt = 0; }
-  cloud.note = "";
-  cloud.state = cloudOn() ? "signed" : (cloudConfigured() ? "ready" : "off");
-  await saveCloudConfig();
-  renderCloudPanel();
-  if (!cloudConfigured()) { toast(t("Sync turned off")); return; }
-  /* 鍵が通るかだけ、その場で叩いて確かめる。入るのはそのあと */
-  try {
-    const r = await fetch(`${cloud.url}/auth/v1/settings`, { headers: { apikey: cloud.key } });
-    if (!r.ok) throw new Error(String(r.status));
-    toast(t("Project reached"));
-  } catch (e) {
-    cloud.state = "error";
-    cloud.note = t("Could not reach it (%s)", String(e.message || e));
-    renderCloudPanel();
-  }
+/* 名前は据え置き。雲の様子が動くたびに呼ばれる場所が方々にある */
+const renderCloudPanel = renderSigninCard;
+
+$("settings-google").addEventListener("click", cloudSignIn);
+$("account-out").addEventListener("click", cloudSignOut);
+$("account-sync").addEventListener("click", async () => {
+  await flushOutbox();
+  if (await cloudPull()) toast(t("Synced"));
 });
 
 
@@ -4129,7 +3978,6 @@ function renderSettings() {
   renderToneRows();
   renderRoastPicker();
   renderLangPicker();
-  fillCloudFields();
   renderCloudPanel();
   /* 同期を入れた人に「この端末の中だけ」と言い続けるわけにはいかない */
   $("s-privacy-note").textContent = cloudOn()
@@ -4414,7 +4262,7 @@ async function boot() {
      待たせはしない。端末の控えで先に描いて、届いたら描き直す */
   if (cloudOn()) {
     flushOutbox()
-      .then(() => cloudPull({ full: justSignedIn }))
+      .then(() => (justSignedIn ? cloudFirstSync() : cloudPull()))
       .then(() => { if (justSignedIn) { renderHome(); toast(t("Signed in")); } });
   }
 
