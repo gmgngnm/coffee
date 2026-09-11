@@ -19,11 +19,11 @@
  *   8. 起動
  * ==================================================================== */
 
-const APP_VERSION = "2.15.1";
+const APP_VERSION = "2.16.0";
 
 /* ホームのロゴの下に #002 の形で出す、mainへマージした回数。
    マージのたびに1つ増やす（この見た目になるまでに何回積んだか） */
-const MERGE_COUNT = 41;
+const MERGE_COUNT = 42;
 
 /* ------------------------------------------------------------------ *
  * 1. 下ごしらえ
@@ -518,6 +518,13 @@ const DICT = {
       "一杯が、どの端末にもついてきます。",
     "Not now":
       "あとで",
+    "Voice": "音色",
+    "Pitch": "高さ",
+    "Bell": "ベル",
+    "Glass": "グラス",
+    "Marimba": "マリンバ",
+    "Wood": "ウッド",
+    "Digital": "電子",
     "Search": "さがす",
   },
   de: {
@@ -944,6 +951,13 @@ const DICT = {
       "Deine Tassen folgen dir auf jedes Gerät.",
     "Not now":
       "Später",
+    "Voice": "Klangfarbe",
+    "Pitch": "Tonhöhe",
+    "Bell": "Glocke",
+    "Glass": "Glas",
+    "Marimba": "Marimba",
+    "Wood": "Holz",
+    "Digital": "Digital",
     "Search": "Suche",
   },
 };
@@ -1284,6 +1298,10 @@ const DEFAULT_SETTINGS = {
   vibe: true,        // 対応端末でバイブ
   wakelock: true,    // タイマー中は画面を消さない
   volume: 70,
+  chimeVoice: "bell",  // チーンの音色
+  chimePitch: 0,       // チーンの高さ（半音、±12）
+  cueVoice: "bell",    // 予告の音色
+  cuePitch: 0,         // 予告の高さ（半音、±12）
   countdown: 3,      // 開始を押してから走り出すまでの秒数（0〜10）
   drips: true,       // 背景に、注いだぶんの雫と液面を出すか
   roast: "medium",   // アクセントの焙煎度
@@ -1818,20 +1836,47 @@ function ensureAudio() {
 
 const volumeGain = () => Math.max(0, Math.min(1, (settings.volume ?? 70) / 100));
 
-/* 金属が鳴るときの倍音は整数倍からずれている。そのずれを真似ると
-   ピーではなく「チーン」に近づく */
-function bellAt(when, base, dur, gain) {
+/* 音色は、倍音の並びと消えかたで決まる。金属は倍音が整数倍から
+   ずれていて、木は速く消える。音声ファイルは持たず、その場で組む。
+     partials … [倍率, 強さ]。1以外を整数からずらすほど金属に寄る
+     hold     … 長さの係数。小さいほど短く切れる
+     attack   … 立ち上がり。短いほど硬い音になる */
+const VOICES = [
+  { id: "bell", name: "Bell", wave: "sine", attack: 0.006, hold: 1,
+    partials: [[1, 1], [2.01, 0.46], [2.98, 0.26], [4.17, 0.13], [5.43, 0.07]] },
+  { id: "glass", name: "Glass", wave: "sine", attack: 0.003, hold: 0.72,
+    partials: [[1, 1], [2.76, 0.34], [5.40, 0.14], [8.93, 0.05]] },
+  { id: "marimba", name: "Marimba", wave: "sine", attack: 0.004, hold: 0.40,
+    partials: [[1, 1], [3.93, 0.30], [9.22, 0.08]] },
+  { id: "wood", name: "Wood", wave: "triangle", attack: 0.002, hold: 0.13,
+    partials: [[1, 1], [1.51, 0.55], [2.43, 0.32], [3.80, 0.16]] },
+  { id: "digital", name: "Digital", wave: "square", attack: 0.002, hold: 0.28,
+    partials: [[1, 0.7], [2, 0.18]] },
+];
+const findVoice = (id) => VOICES.find((v) => v.id === id) || VOICES[0];
+
+/* 半音で動かす。12で1オクターブ */
+const pitched = (base, semis) => base * Math.pow(2, (semis || 0) / 12);
+
+/* いまの高さを音名で見せる。Hzより、A6のほうが手がかりになる */
+const NOTE_NAMES = ["C", "C♯", "D", "D♯", "E", "F", "F♯", "G", "G♯", "A", "A♯", "B"];
+function noteName(freq) {
+  const n = Math.round(12 * Math.log2(freq / 440)) + 9;
+  return `${NOTE_NAMES[((n % 12) + 12) % 12]}${4 + Math.floor(n / 12)}`;
+}
+
+function voiceAt(voice, when, base, dur, gain) {
   const ctx = audioCtx;
-  const partials = [[1, 1], [2.01, 0.46], [2.98, 0.26], [4.17, 0.13], [5.43, 0.07]];
-  for (const [mult, amp] of partials) {
+  const v = findVoice(voice);
+  for (const [mult, amp] of v.partials) {
     const osc = ctx.createOscillator();
     const g = ctx.createGain();
-    osc.type = "sine";
+    osc.type = v.wave;
     osc.frequency.setValueAtTime(base * mult, when);
-    /* 高い倍音ほど早く消える。これも本物の鐘のふるまい */
-    const life = dur * (mult > 3 ? 0.45 : mult > 2 ? 0.7 : 1);
+    /* 高い倍音ほど早く消える。本物の鐘も木も、そうふるまう */
+    const life = dur * v.hold * (mult > 3 ? 0.45 : mult > 2 ? 0.7 : 1);
     g.gain.setValueAtTime(0.0001, when);
-    g.gain.exponentialRampToValueAtTime(Math.max(0.0002, gain * amp), when + 0.006);
+    g.gain.exponentialRampToValueAtTime(Math.max(0.0002, gain * amp), when + v.attack);
     g.gain.exponentialRampToValueAtTime(0.0001, when + life);
     osc.connect(g).connect(ctx.destination);
     osc.start(when);
@@ -1848,22 +1893,24 @@ function bellAt(when, base, dur, gain) {
      終わり … チーーン（低く、長く伸ばす）
    注ぐ以外の手順（混ぜる・押すなど）は1回。
    kind: "step" / "finish" / "cue"（予告） */
-/* チーンの高さ。合図は A6、淹れ終わりはその1オクターブ上の A7。
-   予告はそのあいだの C7 を、ごく小さく */
+/* 素の高さ。合図は A6、予告はそのすこし上の C7。設定の半音で動かす。
+   淹れ終わりは、合図の1オクターブ上にいつも付いていく */
 const TONE_STEP = 1760;
-const TONE_FINISH = TONE_STEP * 2;
 const TONE_CUE = 2093;
+
+const chimeFreq = () => pitched(TONE_STEP, settings.chimePitch);
+const cueFreq = () => pitched(TONE_CUE, settings.cuePitch);
 
 function scheduleSound(kind, when, count = 1) {
   if (!ensureAudio()) return;
   const v = volumeGain();
   if (v <= 0) return;
-  if (kind === "cue") { bellAt(when, TONE_CUE, 0.4, 0.08 * v); return; }
+  if (kind === "cue") { voiceAt(settings.cueVoice, when, cueFreq(), 0.4, 0.08 * v); return; }
   /* 高い音は耳に刺さりやすいので、長く伸ばすぶん少し弱める */
-  if (kind === "finish") { bellAt(when, TONE_FINISH, 3.6, 0.24 * v); return; }
+  if (kind === "finish") { voiceAt(settings.chimeVoice, when, chimeFreq() * 2, 3.6, 0.24 * v); return; }
   /* 数えられる速さで、かつ間延びしない間隔 */
   for (let i = 0; i < Math.max(1, count); i++) {
-    bellAt(when + i * 0.26, TONE_STEP, 0.8, 0.26 * v);
+    voiceAt(settings.chimeVoice, when + i * 0.26, chimeFreq(), 0.8, 0.26 * v);
   }
 }
 
@@ -4079,6 +4126,7 @@ function renderSettings() {
   $("s-volume-out").textContent = `${settings.volume}%`;
   $("s-countdown").value = String(settings.countdown);
   $("s-countdown-out").textContent = settings.countdown ? `${settings.countdown} s` : t("off");
+  renderToneRows();
   renderRoastPicker();
   renderLangPicker();
   fillCloudFields();
@@ -4092,8 +4140,8 @@ function renderSettings() {
     t("On this device: %s, %s", counted(liveRecipes().length, "recipe"), counted(liveBrews().length, "brew"));
 }
 
-bindSwitch("s-chime", "chime", () => { syncMuteIcon(); if (timer.state === "running") scheduleUpcomingSounds(); });
-bindSwitch("s-precue", "precue", () => { if (timer.state === "running") scheduleUpcomingSounds(); });
+bindSwitch("s-chime", "chime", () => { syncMuteIcon(); renderToneRows(); if (timer.state === "running") scheduleUpcomingSounds(); });
+bindSwitch("s-precue", "precue", () => { renderToneRows(); if (timer.state === "running") scheduleUpcomingSounds(); });
 bindSwitch("s-vibe", "vibe");
 bindSwitch("s-drips", "drips", () => {
   /* 切ったら、残っている絵をその場で消す */
@@ -4113,7 +4161,63 @@ $("s-countdown").addEventListener("input", (e) => {
   $("s-countdown-out").textContent = settings.countdown ? `${settings.countdown} s` : t("off");
 });
 $("s-countdown").addEventListener("change", saveSettings);
-$("s-test-chime").addEventListener("click", () => playSoundNow("step", 2));
+/* ---------- 音色と高さ ---------- *
+ *  声は聴いてみないと選べないので、押したその場で鳴らす。高さは
+ *  Hz ではなく音名で見せる。A6 のほうが 1760 より手がかりになる
+ * ------------------------------------------------------------------ */
+function renderVoicePicker(who) {
+  const box = $(`s-${who}-voice`);
+  if (!box) return;
+  const key = who === "chime" ? "chimeVoice" : "cueVoice";
+  box.innerHTML = "";
+  for (const voice of VOICES) {
+    const b = el("button", "voice-chip" + (settings[key] === voice.id ? " on" : ""), t(voice.name));
+    b.type = "button";
+    b.setAttribute("aria-pressed", String(settings[key] === voice.id));
+    b.addEventListener("click", async () => {
+      settings[key] = voice.id;
+      await saveSettings();
+      renderVoicePicker(who);
+      playSoundNow(who === "chime" ? "step" : "cue", 1);
+      if (timer.state === "running") scheduleUpcomingSounds();
+    });
+    box.appendChild(b);
+  }
+}
+
+function renderToneRows() {
+  for (const who of ["chime", "cue"]) {
+    const key = who === "chime" ? "chimePitch" : "cuePitch";
+    const base = who === "chime" ? TONE_STEP : TONE_CUE;
+    const slider = $(`s-${who}-pitch`);
+    if (!slider) continue;
+    slider.value = String(settings[key] ?? 0);
+    $(`s-${who}-pitch-out`).textContent = noteName(pitched(base, settings[key]));
+    renderVoicePicker(who);
+  }
+  /* 鳴らさない音の細工は出しておいても仕方がない */
+  $("s-chime-tone").hidden = !settings.chime;
+  $("s-cue-tone").hidden = !settings.precue;
+}
+
+for (const who of ["chime", "cue"]) {
+  const key = who === "chime" ? "chimePitch" : "cuePitch";
+  const base = who === "chime" ? TONE_STEP : TONE_CUE;
+  const slider = $(`s-${who}-pitch`);
+  /* つまみを動かしているあいだは音名だけ。指を離したときに一度だけ鳴らす */
+  slider.addEventListener("input", () => {
+    settings[key] = Number(slider.value);
+    $(`s-${who}-pitch-out`).textContent = noteName(pitched(base, settings[key]));
+  });
+  slider.addEventListener("change", async () => {
+    settings[key] = Number(slider.value);
+    await saveSettings();
+    playSoundNow(who === "chime" ? "step" : "cue", 1);
+    if (timer.state === "running") scheduleUpcomingSounds();
+  });
+  $(`s-${who}-test`).addEventListener("click", () =>
+    playSoundNow(who === "chime" ? "step" : "cue", who === "chime" ? 2 : 1));
+}
 /* 見本の丸は、いま見えている面での色をそのまま塗る。選んだ結果が
    そのとおりに出るほうが、選びやすい */
 function renderRoastPicker() {

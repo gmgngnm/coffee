@@ -714,3 +714,30 @@ input[type="range"]::-moz-range-thumb{
 .gbtn-mark{display:flex;line-height:0;flex-shrink:0;}
 .text-btn.quiet{color:var(--ink-faint);font-size:12.5px;padding:2px 8px;}
 
+
+/* ---------- 音色の選び口 ---------- *
+ *  5つを横一列に。狭い画面では折り返す
+ * ------------------------------------------------------------------ */
+.set-row.stack.tone{padding-top:4px;}
+/* 5つを等分で一列に。折り返して最後の1つだけ横いっぱいに伸びる、
+   という見え方にならないよう、升目で切る */
+.voice-row{
+  display:grid;grid-template-columns:repeat(5, 1fr);gap:6px;
+  margin:2px 0 12px;
+}
+.voice-chip{
+  appearance:none;border:1px solid var(--line);background:var(--surface);
+  color:var(--ink-soft);font:inherit;font-size:11px;letter-spacing:-.01em;
+  padding:9px 1px;border-radius:10px;cursor:pointer;
+  white-space:nowrap;overflow:hidden;text-overflow:ellipsis;
+  transition:transform .1s ease, border-color .15s, color .15s;
+}
+@media (min-width:380px){ .voice-chip{font-size:12px;padding:9px 3px;} }
+/* 幅の無い端末では5つ横並びだと「マリンバ」が切れる。3つずつに折る
+   （升目なので、余った2つが横いっぱいに伸びることはない） */
+@media (max-width:359px){ .voice-row{grid-template-columns:repeat(3, 1fr);} }
+.voice-chip:active{transform:scale(.96);}
+.voice-chip.on{
+  border-color:var(--accent);color:var(--accent-ink);font-weight:600;
+  background:color-mix(in srgb, var(--accent) 9%, var(--surface));
+}

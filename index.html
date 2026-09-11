@@ -407,14 +407,38 @@
           <span class="set-name"><strong data-i18n>Chime</strong><small data-i18n>Rings once per pour number</small></span>
           <input type="checkbox" id="s-chime" checked>
         </label>
+        <div class="set-row stack tone" id="s-chime-tone">
+          <div class="set-head">
+            <label data-i18n>Voice</label>
+            <button class="text-btn" id="s-chime-test" type="button" data-i18n>Hear it</button>
+          </div>
+          <div class="voice-row" id="s-chime-voice"></div>
+          <div class="set-head">
+            <label for="s-chime-pitch" data-i18n>Pitch</label>
+            <span class="mono" id="s-chime-pitch-out"></span>
+          </div>
+          <input id="s-chime-pitch" type="range" min="-12" max="12" step="1" value="0">
+        </div>
         <label class="set-row">
           <span class="set-name"><strong data-i18n>Pre-cue</strong><small data-i18n>A soft tick 3 seconds before</small></span>
           <input type="checkbox" id="s-precue" checked>
         </label>
+        <div class="set-row stack tone" id="s-cue-tone">
+          <div class="set-head">
+            <label data-i18n>Voice</label>
+            <button class="text-btn" id="s-cue-test" type="button" data-i18n>Hear it</button>
+          </div>
+          <div class="voice-row" id="s-cue-voice"></div>
+          <div class="set-head">
+            <label for="s-cue-pitch" data-i18n>Pitch</label>
+            <span class="mono" id="s-cue-pitch-out"></span>
+          </div>
+          <input id="s-cue-pitch" type="range" min="-12" max="12" step="1" value="0">
+        </div>
         <div class="set-row stack">
           <div class="set-head">
             <label for="s-volume" data-i18n>Volume</label>
-            <span class="set-side"><span class="mono" id="s-volume-out">70%</span><button class="text-btn" id="s-test-chime" type="button" data-i18n>Hear it</button></span>
+            <span class="mono" id="s-volume-out">70%</span>
           </div>
           <input id="s-volume" type="range" min="0" max="100" step="5" value="70">
         </div>
