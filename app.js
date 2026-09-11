@@ -19,11 +19,11 @@
  *   8. 起動
  * ==================================================================== */
 
-const APP_VERSION = "2.17.1";
+const APP_VERSION = "2.18.0";
 
 /* ホームのロゴの下に #002 の形で出す、mainへマージした回数。
    マージのたびに1つ増やす（この見た目になるまでに何回積んだか） */
-const MERGE_COUNT = 44;
+const MERGE_COUNT = 45;
 
 /* ------------------------------------------------------------------ *
  * 1. 下ごしらえ
@@ -468,6 +468,36 @@ const DICT = {
       "同期できませんでした",
     "No connection. It will catch up by itself.":
       "つながっていません。繋がり次第ひとりでに追いつきます。",
+    "Clean cup":
+      "クリーンカップ",
+    "Clean":
+      "クリーン",
+    "Flavour":
+      "フレーバー",
+    "Body & aftertaste":
+      "量感と余韻",
+    "Body":
+      "余韻",
+    "Texture":
+      "質感",
+    "Balance & overall":
+      "バランス・総合",
+    "Overall":
+      "総合",
+    "Five marks, the way a Brewers Cup cup is judged. The last one becomes this cup's stars.":
+      "ブリューワーズカップと同じ5項目で。いちばん下がこの一杯の星になります。",
+    "Five marks, the way a Brewers Cup cup is judged. Each one is one to five stars.":
+      "ブリューワーズカップと同じ5項目を、それぞれ星5つで。",
+    "Freedom from off-notes. How transparent the cup is.":
+      "雑味のなさ、透明感。",
+    "The character of the aroma and taste, and how much is going on.":
+      "香りと風味の特徴、そして複雑さ。",
+    "How it fills the mouth, and what stays after you swallow.":
+      "口中での広がりと、飲んだあとに残るもの。",
+    "How the liquid itself feels — the mouthfeel.":
+      "液体そのものの手ざわり（マウスフィール）。",
+    "How the four above come together. This one becomes the cup's star rating.":
+      "上の4つがどう噛み合っているか。ここがこの一杯の星になります。",
     "Search": "さがす",
   },
   de: {
@@ -846,6 +876,36 @@ const DICT = {
       "Abgleich fehlgeschlagen",
     "No connection. It will catch up by itself.":
       "Keine Verbindung. Holt von selbst auf, sobald wieder da.",
+    "Clean cup":
+      "Sauberkeit",
+    "Clean":
+      "Sauber",
+    "Flavour":
+      "Aroma",
+    "Body & aftertaste":
+      "Körper & Nachklang",
+    "Body":
+      "Körper",
+    "Texture":
+      "Textur",
+    "Balance & overall":
+      "Balance & Gesamt",
+    "Overall":
+      "Gesamt",
+    "Five marks, the way a Brewers Cup cup is judged. The last one becomes this cup's stars.":
+      "Fünf Noten, wie beim Brewers Cup. Die letzte wird zu den Sternen dieser Tasse.",
+    "Five marks, the way a Brewers Cup cup is judged. Each one is one to five stars.":
+      "Fünf Noten, wie beim Brewers Cup — jede von einem bis fünf Sternen.",
+    "Freedom from off-notes. How transparent the cup is.":
+      "Frei von Fehlnoten. Wie klar die Tasse ist.",
+    "The character of the aroma and taste, and how much is going on.":
+      "Der Charakter von Duft und Geschmack — und wie viel darin passiert.",
+    "How it fills the mouth, and what stays after you swallow.":
+      "Wie sie den Mund füllt, und was nach dem Schlucken bleibt.",
+    "How the liquid itself feels — the mouthfeel.":
+      "Wie sich die Flüssigkeit selbst anfühlt.",
+    "How the four above come together. This one becomes the cup's star rating.":
+      "Wie die vier oben zusammenkommen. Diese Note wird zu den Sternen der Tasse.",
     "Search": "Suche",
   },
 };
@@ -1030,12 +1090,12 @@ const HELP = {
       ["Temp (°C)", "Water temperature at the moment you poured. Lower is gentler on a dark roast."],
       ["Brew time", "How long from the first drop of water to the last, as m:ss."],
       ["Ratio", "Worked out for you from dose and water. 1:16 means 16 g of water per gram of coffee — around there is the usual place to start."],
-      ["Overall", "One to five stars, your own verdict. Nothing else in the app is calculated from it except the average."],
-      ["Acidity", "The bright, fruity edge — lemon, berry. 1 is flat, 5 is sharp."],
-      ["Sweetness", "Sugar, caramel, ripe fruit. Usually what comes back when the grind is right."],
-      ["Bitterness", "The dry, dark side. A high one often means too fine, too hot or too long."],
-      ["Body", "How heavy it feels in the mouth, from tea-like to syrupy."],
-      ["Aroma", "How much it gives off before you drink it."],
+      ["Taste", "Five marks, the way a Brewers Cup cup is judged. Each one is one to five stars."],
+      ["Clean cup", "Freedom from off-notes. How transparent the cup is."],
+      ["Flavour", "The character of the aroma and taste, and how much is going on."],
+      ["Body & aftertaste", "How it fills the mouth, and what stays after you swallow."],
+      ["Texture", "How the liquid itself feels — the mouthfeel."],
+      ["Balance & overall", "How the four above come together. This one becomes the cup's star rating."],
       ["Flavour notes", "Tap the words that fit, or add your own. They come back in search."],
       ["How was it?", "Free writing about the cup you actually drank."],
       ["Next time", "The one change you want to make on the next go. Read it before you brew these beans again."],
@@ -1242,7 +1302,7 @@ function emptyBrew() {
     method: "", grind: "", grinder: "",
     doseG: null, waterG: null, tempC: null, timeSec: null,
     recipeId: "", recipeName: "",
-    taste: { acidity: 3, sweetness: 3, bitterness: 3, body: 3, aroma: 3 },
+    taste: {},
     rating: 0, flavors: [], notes: "", next: "",
     createdAt: now, updatedAt: now, deleted: false,
   };
@@ -3334,10 +3394,22 @@ $("log-add-btn").addEventListener("click", () => {
 $("home-manual-log-btn").addEventListener("click", () => $("log-add-btn").click());
 
 /* ---------- 記録の詳細 ---------- */
+/* 味の軸は Brewers Cup の採点項目に合わせてある。酸味・甘み・苦味は
+   「豆がどんな味か」を分解する物差しで、淹れ手の腕を測るものではない。
+   クリーンカップや余韻のほうが、同じ豆を淹れ比べたときに動く。
+      key   … しまう名前（英語のまま。訳を変えても記録は壊れない）
+      name  … 欄に出す名前
+      short … レーダーの頂点に出す短い名前（長いと図から食み出す）
+      note  … はてなに出す説明 */
 const TASTE_AXES = [
-  ["acidity", "Acidity"], ["sweetness", "Sweetness"], ["bitterness", "Bitterness"],
-  ["body", "Body"], ["aroma", "Aroma"],
+  ["clean",   "Clean cup",        "Clean",    "Freedom from off-notes. How transparent the cup is."],
+  ["flavor",  "Flavour",          "Flavour",  "The character of the aroma and taste, and how much is going on."],
+  ["body",    "Body & aftertaste","Body",     "How it fills the mouth, and what stays after you swallow."],
+  ["texture", "Texture",          "Texture",  "How the liquid itself feels — the mouthfeel."],
+  ["balance", "Balance & overall","Overall",  "How the four above come together. This one becomes the cup's star rating."],
 ];
+/* 総合はそのまま一杯の星になる。一覧の絞り込みも平均も、ここを見ている */
+const OVERALL_AXIS = "balance";
 
 /* 5つの軸をレーダーで描く。数字の羅列より、輪郭のほうが一杯ごとの
    違いを思い出しやすい */
@@ -3360,9 +3432,9 @@ function tasteRadar(taste) {
   });
   const shape = TASTE_AXES.map(([key], i) => point(i, taste?.[key] ?? 0).map((v) => v.toFixed(1)).join(",")).join(" ");
   svg += `<polygon class="shape" points="${shape}"/>`;
-  TASTE_AXES.forEach(([, label], i) => {
+  TASTE_AXES.forEach(([, , short], i) => {
     const [x, y] = point(i, 6.3);
-    svg += `<text class="label" x="${x.toFixed(1)}" y="${(y + 3).toFixed(1)}">${t(label)}</text>`;
+    svg += `<text class="label" x="${x.toFixed(1)}" y="${(y + 3).toFixed(1)}">${t(short)}</text>`;
   });
   return svg + "</svg>";
 }
@@ -3563,8 +3635,7 @@ function openBrewEditor(brew, { isNew }) {
   $("f-next").value = brew.next || "";
   updateRatioReadout();
   renderRecipeSelect();
-  renderStarPicker();
-  renderTasteSliders();
+  renderTasteStars();
   renderFlavorChips();
   showScreen("brew-edit");
 }
@@ -3575,40 +3646,31 @@ function updateRatioReadout() {
 $("f-dose").addEventListener("input", updateRatioReadout);
 $("f-water").addEventListener("input", updateRatioReadout);
 
-function renderStarPicker() {
-  const box = $("f-rating");
-  box.innerHTML = "";
-  for (let i = 1; i <= 5; i++) {
-    const b = el("button", `star${i <= (editingBrew.rating || 0) ? " on" : ""}`, "★");
-    b.type = "button";
-    b.setAttribute("aria-label", `${i} out of 5`);
-    b.addEventListener("click", () => {
-      /* 同じ星をもう一度押したら取り消し。付け間違いを直せるように */
-      editingBrew.rating = editingBrew.rating === i ? 0 : i;
-      renderStarPicker();
-    });
-    box.appendChild(b);
-  }
-}
-
-function renderTasteSliders() {
+/* 5項目を星で。つまみより、星のほうが押した手ごたえがある。
+   同じ星をもう一度押したら取り消し（付け間違いを直せるように） */
+function renderTasteStars() {
   const box = $("f-taste");
   box.innerHTML = "";
-  for (const [key, label] of TASTE_AXES) {
+  for (const [key, name] of TASTE_AXES) {
     const row = el("div", "taste-row");
-    row.appendChild(el("span", "taste-name", t(label)));
-    const input = document.createElement("input");
-    input.type = "range";
-    input.min = "1"; input.max = "5"; input.step = "1";
-    input.value = String(editingBrew.taste?.[key] ?? 3);
-    const out = el("span", "taste-val mono", input.value);
-    input.addEventListener("input", () => {
-      editingBrew.taste = editingBrew.taste || {};
-      editingBrew.taste[key] = Number(input.value);
-      out.textContent = input.value;
-    });
-    row.appendChild(input);
-    row.appendChild(out);
+    row.appendChild(el("span", "taste-name", t(name)));
+    const stars = el("div", "stars");
+    stars.setAttribute("role", "group");
+    stars.setAttribute("aria-label", t(name));
+    const score = editingBrew.taste?.[key] || 0;
+    for (let i = 1; i <= 5; i++) {
+      const b = el("button", `star${i <= score ? " on" : ""}`, "★");
+      b.type = "button";
+      b.setAttribute("aria-label", `${i} / 5`);
+      b.addEventListener("click", () => {
+        editingBrew.taste = editingBrew.taste || {};
+        editingBrew.taste[key] = editingBrew.taste[key] === i ? 0 : i;
+        if (key === OVERALL_AXIS) editingBrew.rating = editingBrew.taste[key];
+        renderTasteStars();
+      });
+      stars.appendChild(b);
+    }
+    row.appendChild(stars);
     box.appendChild(row);
   }
 }
@@ -3659,6 +3721,8 @@ $("brew-save").addEventListener("click", async () => {
   b.timeSec = parseClock($("f-time").value);
   b.notes = $("f-notes").value.trim();
   b.next = $("f-next").value.trim();
+  /* 総合の星が、そのまま一杯の星。一覧の絞り込みも平均もここを見ている */
+  b.rating = b.taste?.[OVERALL_AXIS] || 0;
   const picked = $("f-recipe").value;
   if (!picked) { b.recipeId = ""; b.recipeName = ""; }
   else {
@@ -4124,7 +4188,7 @@ function brewsCsv() {
   const headers = [
     "Brewed at", "Coffee", "Roaster", "Roast", "Brewer", "Grind", "Grinder setting",
     "Dose (g)", "Water (g)", "Ratio", "Temp (C)", "Brew time", "Brew seconds", "Recipe",
-    "Rating", "Acidity", "Sweetness", "Bitterness", "Body", "Aroma", "Flavours", "How it went", "Next time",
+    "Rating", ...TASTE_AXES.map(([, name]) => name), "Flavours", "How it went", "Next time",
   ];
   const rows = liveBrews().slice().reverse().map((b) => [
     fmtStamp(b.brewedAt),
