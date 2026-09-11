@@ -19,11 +19,11 @@
  *   8. 起動
  * ==================================================================== */
 
-const APP_VERSION = "2.15.0";
+const APP_VERSION = "2.15.1";
 
 /* ホームのロゴの下に #002 の形で出す、mainへマージした回数。
    マージのたびに1つ増やす（この見た目になるまでに何回積んだか） */
-const MERGE_COUNT = 40;
+const MERGE_COUNT = 41;
 
 /* ------------------------------------------------------------------ *
  * 1. 下ごしらえ
@@ -1579,7 +1579,6 @@ async function cloudSignOut() {
   cloud.pulledAt = 0;
   cloud.state = cloudConfigured() ? "ready" : "off";
   cloud.note = "";
-  signinHidden = false;
   await saveCloudConfig();
   renderCloudPanel();
 }
@@ -2220,7 +2219,6 @@ function greetingFor(hour) {
 function renderHome() {
   $("greeting").textContent = greetingFor(new Date().getHours());
 
-  renderHomeSignin();
   renderHomeStats($("home-stats"), liveBrews());
 
   const list = liveRecipes();
@@ -3927,28 +3925,11 @@ $("free-timer-btn").addEventListener("click", () => openTimer(null));
 /* ---------- 雲の設定 ---------- */
 /* Google の印つきのボタン。見慣れた形でないと「ログインできる」と
    気づいてもらえないので、白地と4色の印はそのまま使う */
-const G_MARK = '<svg viewBox="0 0 48 48" width="18" height="18" aria-hidden="true">'
-  + '<path fill="#EA4335" d="M24 9.5c3.54 0 6.71 1.22 9.21 3.6l6.85-6.85C35.9 2.38 30.47 0 24 0 14.62 0 6.51 5.38 2.56 13.22l7.98 6.19C12.43 13.72 17.74 9.5 24 9.5z"/>'
-  + '<path fill="#4285F4" d="M46.98 24.55c0-1.57-.15-3.09-.38-4.55H24v9.02h12.94c-.58 2.96-2.26 5.48-4.78 7.18l7.73 6c4.51-4.18 7.09-10.36 7.09-17.65z"/>'
-  + '<path fill="#FBBC05" d="M10.53 28.59c-.48-1.45-.76-2.99-.76-4.59s.27-3.14.76-4.59l-7.98-6.19C.92 16.46 0 20.12 0 24c0 3.88.92 7.54 2.56 10.78l7.97-6.19z"/>'
-  + '<path fill="#34A853" d="M24 48c6.48 0 11.93-2.13 15.89-5.81l-7.73-6c-2.15 1.45-4.92 2.3-8.16 2.3-6.26 0-11.57-4.22-13.47-9.91l-7.98 6.19C6.51 42.62 14.62 48 24 48z"/></svg>';
-
-function googleButton() {
-  const b = el("button", "gbtn");
-  b.type = "button";
-  b.innerHTML = `<span class="gbtn-mark">${G_MARK}</span><span class="gbtn-label"></span>`;
-  b.querySelector(".gbtn-label").textContent = t("Sign in with Google");
-  b.addEventListener("click", cloudSignIn);
-  return b;
-}
-
-/* ホームの入口。入っていれば消える。「あとで」を押した人にも出さない */
-let signinHidden = false;
-
-function renderHomeSignin() {
-  const card = $("home-signin");
+/* 入口は設定の頭にひとつだけ。入っていれば消える */
+function renderSigninCard() {
+  const card = $("settings-signin");
   if (!card) return;
-  card.hidden = !(cloudConfigured() && !cloudOn()) || signinHidden;
+  card.hidden = !(cloudConfigured() && !cloudOn());
 }
 
 /* 欄へ書き戻すのは、開いたときと、しまえたときだけ。様子を描き直す
@@ -3960,7 +3941,7 @@ function fillCloudFields() {
 }
 
 function renderCloudPanel() {
-  renderHomeSignin();
+  renderSigninCard();
   const line = $("s-cloud-state");
   const btns = $("s-cloud-btns");
   if (!line || !btns) return;
@@ -3987,10 +3968,8 @@ function renderCloudPanel() {
     return b;
   };
   if (!cloudConfigured()) return;
-  if (!cloudOn()) {
-    btns.appendChild(googleButton());
-    return;
-  }
+  /* 入る前のボタンは、この画面の頭にある札のほう。ここでは出さない */
+  if (!cloudOn()) return;
   const pair = el("div", "btn-pair");
   btns.appendChild(pair);
   const inPair = (label, fn) => {
@@ -4010,12 +3989,7 @@ function renderCloudPanel() {
   btns.appendChild(up);
 }
 
-$("home-google").addEventListener("click", cloudSignIn);
-$("home-signin-later").addEventListener("click", () => {
-  /* この起動のあいだは引っ込む。設定にはいつでもある */
-  signinHidden = true;
-  renderHomeSignin();
-});
+$("settings-google").addEventListener("click", cloudSignIn);
 
 $("s-cloud-save").addEventListener("click", async () => {
   const url = $("s-cloud-url").value.trim().replace(/\/+$/, "");
