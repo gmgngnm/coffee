@@ -694,7 +694,7 @@ input[type="range"]::-moz-range-thumb{
  * ------------------------------------------------------------------ */
 .signin-card{
   background:var(--surface);border:1px solid var(--line);border-radius:16px;
-  padding:16px 16px 12px;margin:0 0 16px;
+  padding:16px;margin:4px 0 22px;
   display:flex;flex-direction:column;align-items:center;gap:12px;
   box-shadow:var(--shadow);
 }
@@ -714,5 +714,3 @@ input[type="range"]::-moz-range-thumb{
 .gbtn-mark{display:flex;line-height:0;flex-shrink:0;}
 .text-btn.quiet{color:var(--ink-faint);font-size:12.5px;padding:2px 8px;}
 
-/* 設定の中では、まわりのボタンと幅を揃える */
-#s-cloud-btns .gbtn{margin:0;}
