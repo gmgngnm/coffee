@@ -165,7 +165,9 @@ input,select,textarea{font-family:inherit;}
 .stat-strip.home .stat:not(.wide) .stat-num .small{font-size:14px;margin-left:5px;}
 .stat-strip.home .stat:not(.wide) .stat-label{font-size:11.5px;margin-top:7px;}
 .stat-head{display:flex;align-items:baseline;justify-content:space-between;gap:8px;}
-.stat-head .stat-label{margin-top:0;text-align:right;white-space:nowrap;}
+/* 右肩の「>」ぶんだけ空けておく。日本語の「この30日」は英語より広いので、
+   空けないと矢印に文字が乗る */
+.stat-head .stat-label{margin-top:0;text-align:right;white-space:nowrap;padding-right:16px;}
 .stat-head .stat-label.live{color:var(--ink-soft);}
 .spark{position:relative;margin-top:5px;height:34px;}
 .spark svg{display:block;width:100%;height:34px;overflow:visible;}
@@ -685,3 +687,32 @@ input[type="range"]::-moz-range-thumb{
 .set-group .btn-row{flex-wrap:wrap;}
 .btn-pair{display:flex;gap:10px;width:100%;}
 .btn-pair .wide-btn{flex:1;}
+
+/* ---------- Google の入口 ---------- *
+ *  見慣れた形でないと「ここから入れる」と気づいてもらえない。白地と
+ *  4色の印はGoogleの作法のまま、角の丸みだけこのアプリに寄せてある
+ * ------------------------------------------------------------------ */
+.signin-card{
+  background:var(--surface);border:1px solid var(--line);border-radius:16px;
+  padding:16px 16px 12px;margin:0 0 16px;
+  display:flex;flex-direction:column;align-items:center;gap:12px;
+  box-shadow:var(--shadow);
+}
+.signin-line{
+  font-size:13px;line-height:1.65;color:var(--ink-soft);
+  margin:0;text-align:center;
+}
+.gbtn{
+  display:flex;align-items:center;justify-content:center;gap:10px;
+  width:100%;min-height:46px;padding:0 16px;
+  background:#fff;border:1px solid #DADCE0;border-radius:12px;
+  font:inherit;font-size:15px;font-weight:500;color:#3C4043;
+  cursor:pointer;transition:transform .1s ease, box-shadow .15s, background .15s;
+}
+.gbtn:hover{background:#F8F9FA;box-shadow:0 1px 3px rgba(60,64,67,.16);}
+.gbtn:active{transform:scale(.985);}
+.gbtn-mark{display:flex;line-height:0;flex-shrink:0;}
+.text-btn.quiet{color:var(--ink-faint);font-size:12.5px;padding:2px 8px;}
+
+/* 設定の中では、まわりのボタンと幅を揃える */
+#s-cloud-btns .gbtn{margin:0;}

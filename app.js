@@ -19,11 +19,11 @@
  *   8. 起動
  * ==================================================================== */
 
-const APP_VERSION = "2.14.1";
+const APP_VERSION = "2.15.0";
 
 /* ホームのロゴの下に #002 の形で出す、mainへマージした回数。
    マージのたびに1つ増やす（この見た目になるまでに何回積んだか） */
-const MERGE_COUNT = 39;
+const MERGE_COUNT = 40;
 
 /* ------------------------------------------------------------------ *
  * 1. 下ごしらえ
@@ -514,6 +514,10 @@ const DICT = {
       "プロジェクトが応えると、ボタンが出ます。入ったら一度だけ「この端末のものを全部あげる」を押してください。いまあるものがまるごと上がります。",
     "Your cups live on this device and in your own Supabase project — nowhere else. CSV opens in a spreadsheet — one row per brew, one row per recipe.":
       "あなたの一杯は、この端末と、あなた自身のSupabaseプロジェクトの中だけにあります。CSVは表計算で開けます。1杯1行、1レシピ1行。",
+    "Sign in and your cups follow you to every device.":
+      "一杯が、どの端末にもついてきます。",
+    "Not now":
+      "あとで",
     "Search": "さがす",
   },
   de: {
@@ -936,6 +940,10 @@ const DICT = {
       "Sobald das Projekt antwortet, erscheint der Knopf. Nach der Anmeldung einmal „Alles von diesem Gerät hochladen“ drücken, damit das Vorhandene nach oben geht.",
     "Your cups live on this device and in your own Supabase project — nowhere else. CSV opens in a spreadsheet — one row per brew, one row per recipe.":
       "Deine Tassen liegen auf diesem Gerät und in deinem eigenen Supabase-Projekt — sonst nirgends. CSV öffnet sich in der Tabelle — eine Zeile je Tasse, eine je Rezept.",
+    "Sign in and your cups follow you to every device.":
+      "Deine Tassen folgen dir auf jedes Gerät.",
+    "Not now":
+      "Später",
     "Search": "Suche",
   },
 };
@@ -1571,6 +1579,7 @@ async function cloudSignOut() {
   cloud.pulledAt = 0;
   cloud.state = cloudConfigured() ? "ready" : "off";
   cloud.note = "";
+  signinHidden = false;
   await saveCloudConfig();
   renderCloudPanel();
 }
@@ -1773,6 +1782,7 @@ window.addEventListener("hashchange", async () => {
     renderCloudPanel();
     await flushOutbox();
     await cloudPull({ full: true });
+    renderHome();
     toast(t("Signed in"));
   } else renderCloudPanel();
 });
@@ -2210,6 +2220,7 @@ function greetingFor(hour) {
 function renderHome() {
   $("greeting").textContent = greetingFor(new Date().getHours());
 
+  renderHomeSignin();
   renderHomeStats($("home-stats"), liveBrews());
 
   const list = liveRecipes();
@@ -3914,6 +3925,32 @@ $("free-timer-btn").addEventListener("click", () => openTimer(null));
 
 /* ---------- 設定 ---------- */
 /* ---------- 雲の設定 ---------- */
+/* Google の印つきのボタン。見慣れた形でないと「ログインできる」と
+   気づいてもらえないので、白地と4色の印はそのまま使う */
+const G_MARK = '<svg viewBox="0 0 48 48" width="18" height="18" aria-hidden="true">'
+  + '<path fill="#EA4335" d="M24 9.5c3.54 0 6.71 1.22 9.21 3.6l6.85-6.85C35.9 2.38 30.47 0 24 0 14.62 0 6.51 5.38 2.56 13.22l7.98 6.19C12.43 13.72 17.74 9.5 24 9.5z"/>'
+  + '<path fill="#4285F4" d="M46.98 24.55c0-1.57-.15-3.09-.38-4.55H24v9.02h12.94c-.58 2.96-2.26 5.48-4.78 7.18l7.73 6c4.51-4.18 7.09-10.36 7.09-17.65z"/>'
+  + '<path fill="#FBBC05" d="M10.53 28.59c-.48-1.45-.76-2.99-.76-4.59s.27-3.14.76-4.59l-7.98-6.19C.92 16.46 0 20.12 0 24c0 3.88.92 7.54 2.56 10.78l7.97-6.19z"/>'
+  + '<path fill="#34A853" d="M24 48c6.48 0 11.93-2.13 15.89-5.81l-7.73-6c-2.15 1.45-4.92 2.3-8.16 2.3-6.26 0-11.57-4.22-13.47-9.91l-7.98 6.19C6.51 42.62 14.62 48 24 48z"/></svg>';
+
+function googleButton() {
+  const b = el("button", "gbtn");
+  b.type = "button";
+  b.innerHTML = `<span class="gbtn-mark">${G_MARK}</span><span class="gbtn-label"></span>`;
+  b.querySelector(".gbtn-label").textContent = t("Sign in with Google");
+  b.addEventListener("click", cloudSignIn);
+  return b;
+}
+
+/* ホームの入口。入っていれば消える。「あとで」を押した人にも出さない */
+let signinHidden = false;
+
+function renderHomeSignin() {
+  const card = $("home-signin");
+  if (!card) return;
+  card.hidden = !(cloudConfigured() && !cloudOn()) || signinHidden;
+}
+
 /* 欄へ書き戻すのは、開いたときと、しまえたときだけ。様子を描き直す
    たびに書き戻すと、打ちかけの鍵が消える */
 function fillCloudFields() {
@@ -3923,6 +3960,7 @@ function fillCloudFields() {
 }
 
 function renderCloudPanel() {
+  renderHomeSignin();
   const line = $("s-cloud-state");
   const btns = $("s-cloud-btns");
   if (!line || !btns) return;
@@ -3950,7 +3988,7 @@ function renderCloudPanel() {
   };
   if (!cloudConfigured()) return;
   if (!cloudOn()) {
-    add(t("Sign in with Google"), "primary", cloudSignIn);
+    btns.appendChild(googleButton());
     return;
   }
   const pair = el("div", "btn-pair");
@@ -3971,6 +4009,13 @@ function renderCloudPanel() {
   });
   btns.appendChild(up);
 }
+
+$("home-google").addEventListener("click", cloudSignIn);
+$("home-signin-later").addEventListener("click", () => {
+  /* この起動のあいだは引っ込む。設定にはいつでもある */
+  signinHidden = true;
+  renderHomeSignin();
+});
 
 $("s-cloud-save").addEventListener("click", async () => {
   const url = $("s-cloud-url").value.trim().replace(/\/+$/, "");
@@ -4292,7 +4337,7 @@ async function boot() {
   if (cloudOn()) {
     flushOutbox()
       .then(() => cloudPull({ full: justSignedIn }))
-      .then(() => { if (justSignedIn) toast(t("Signed in")); });
+      .then(() => { if (justSignedIn) { renderHome(); toast(t("Signed in")); } });
   }
 
   if ("serviceWorker" in navigator) {
