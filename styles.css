@@ -676,14 +676,31 @@ input[type="range"]::-moz-range-thumb{
 :lang(ja) .stat-num .small,
 :lang(ja) .stat-strip.home .stat:not(.wide) .stat-num .small{margin-left:1px;}
 
-/* ---------- 雲の様子 ---------- */
-.cloud-state{
-  font-size:12.5px;line-height:1.7;color:var(--ink-soft);
-  margin:0 0 12px;word-break:break-word;
+/* ---------- 入っている人の札 ---------- *
+ *  繋ぎ先の設定は見せない。誰として入っていて、いつ合わせたか、だけ
+ * ------------------------------------------------------------------ */
+.account-card{
+  background:var(--surface);border:1px solid var(--line);border-radius:16px;
+  padding:14px 16px;margin:4px 0 22px;box-shadow:var(--shadow);
 }
-.cloud-state.bad{color:#9B3B22;}
-.set-row.stack .field.mini{margin-bottom:10px;}
-.set-row.stack .field.mini label{font-size:11px;}
+.account-top{display:flex;align-items:center;gap:9px;}
+.account-mark{display:flex;line-height:0;flex-shrink:0;}
+.account-mail{
+  font-size:14.5px;font-weight:600;color:var(--ink);
+  overflow:hidden;text-overflow:ellipsis;white-space:nowrap;
+}
+.account-bottom{
+  display:flex;align-items:baseline;justify-content:space-between;
+  gap:10px;margin-top:8px;
+}
+.account-state{
+  font-size:12px;color:var(--ink-faint);line-height:1.5;
+  min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;
+}
+/* しくじりの文は長いので、そこだけは折り返してよい */
+.account-state.bad{white-space:normal;}
+.account-state.bad{color:#9B3B22;}
+.account-acts{display:flex;gap:12px;flex-shrink:0;}
 .set-group .btn-row{flex-wrap:wrap;}
 .btn-pair{display:flex;gap:10px;width:100%;}
 .btn-pair .wide-btn{flex:1;}
