@@ -444,11 +444,26 @@ input,select,textarea{font-family:inherit;}
   background:none;border:none;padding:2px;font-size:30px;line-height:1;color:var(--line);
 }
 .star.on{color:var(--accent);}
-.taste-sliders{display:flex;flex-direction:column;gap:9px;margin-bottom:16px;}
-.taste-row{display:flex;align-items:center;gap:11px;}
-.taste-name{font-size:12.5px;color:var(--ink-soft);width:38px;flex-shrink:0;}
-.taste-row input[type="range"]{flex:1;}
-.taste-val{font-family:var(--font-mono);font-size:12.5px;color:var(--accent);width:16px;text-align:right;}
+/* ---------- 味の採点 ---------- *
+ *  項目名の下に星を並べる。横に並べると、日本語の「バランス・総合」で
+ *  折り返して行の高さが揃わなくなる
+ * ------------------------------------------------------------------ */
+.taste-sheet{
+  display:flex;flex-direction:column;
+  border:1px solid var(--line);border-radius:14px;
+  background:var(--surface);overflow:hidden;margin-bottom:16px;
+}
+.taste-row{
+  display:flex;align-items:center;justify-content:space-between;gap:10px;
+  padding:9px 13px;border-top:1px solid var(--line);
+}
+.taste-row:first-child{border-top:0;}
+/* 総合は一杯の星そのものなので、少しだけ重く見せる */
+.taste-row:last-child{background:color-mix(in srgb, var(--accent) 5%, var(--surface));}
+.taste-row:last-child .taste-name{color:var(--ink);font-weight:600;}
+.taste-name{font-size:13px;color:var(--ink-soft);line-height:1.35;}
+.taste-row .stars{flex-shrink:0;}
+.taste-row .star{font-size:24px;padding:1px;}
 input[type="range"]{
   -webkit-appearance:none;appearance:none;height:4px;border-radius:2px;
   background:var(--line);outline:none;
